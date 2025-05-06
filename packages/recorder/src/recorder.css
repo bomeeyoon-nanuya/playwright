@@ -57,3 +57,143 @@ body.dark-mode .recorder .toolbar-button.toggled.circle-large-filled {
 .recorder .selector-input {
   flex: auto;
 }
+
+/* 검증 패널 스타일 */
+.verification-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background-color: var(--vscode-sideBar-background);
+  border-radius: 4px;
+  padding: 10px;
+  position: absolute;
+  top: 40px;
+  left: 180px;
+  z-index: 1000;
+  min-width: 350px;
+  max-width: 550px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: slideDown 0.2s ease-out;
+}
+
+.verification-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 8px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.group-header {
+  font-weight: bold;
+  font-size: 13px;
+  color: var(--vscode-foreground);
+  padding: 8px 10px;
+  background-color: var(--vscode-sideBarSectionHeader-background);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.group-header:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.group-title {
+  flex: 1;
+}
+
+.group-toggle {
+  font-size: 10px;
+  color: var(--vscode-foreground);
+  opacity: 0.7;
+}
+
+.group-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 10px;
+  background-color: var(--vscode-editor-background);
+}
+
+/* 툴바 버튼 호버 효과 개선 */
+.toolbar-button {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  height: 28px;
+  border-radius: 3px;
+  margin: 0 2px;
+  cursor: pointer;
+}
+
+.toolbar-button:hover {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.toolbar-button.toggled {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+/* 비활성화된 버튼 스타일 */
+.toolbar-button.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 자주 사용하는 버튼 스타일 */
+.frequently-used {
+  border-bottom: 2px solid var(--vscode-activityBar-activeBorder);
+}
+
+/* 툴팁 스타일 */
+.tooltip {
+  position: absolute;
+  background-color: var(--vscode-editorHoverWidget-background);
+  color: var(--vscode-editorHoverWidget-foreground);
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 1001;
+  max-width: 300px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.toolbar-button:hover .tooltip {
+  opacity: 1;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 반응형 디자인 */
+@media (max-width: 1200px) {
+  .verification-panel {
+    max-width: 400px;
+  }
+}
+
+@media (max-width: 800px) {
+  .verification-panel {
+    max-width: 300px;
+    left: 120px;
+  }
+}

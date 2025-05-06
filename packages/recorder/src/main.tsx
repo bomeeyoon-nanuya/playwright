@@ -27,8 +27,35 @@ export const Main: React.FC = ({}) => {
 
   React.useLayoutEffect(() => {
     window.playwrightSetMode = setMode;
-    window.playwrightSetSources = (sources, primaryPageURL) => {
-      setSources(sources);
+    window.playwrightSetSources = (sources, options) => {
+      let preserveAssertions = false;
+      let primaryPageURL: string | undefined;
+
+      if (options) {
+        if (typeof options === 'string')
+          primaryPageURL = options;
+        else if (typeof options === 'object' && 'preserveAssertions' in options)
+          preserveAssertions = !!options.preserveAssertions;
+
+      }
+
+      if (preserveAssertions) {
+        setSources(prevSources => {
+          if (!prevSources.length)
+            return sources;
+
+          return sources.map(newSource => {
+            const prevSource = prevSources.find(p => p.id === newSource.id);
+            if (!prevSource)
+              return newSource;
+
+            return mergeSourceCodes(prevSource, newSource);
+          });
+        });
+      } else {
+        setSources(sources);
+      }
+
       window.playwrightSourcesEchoForTest = sources;
       document.title = primaryPageURL
         ? `Playwright Inspector - ${primaryPageURL}`
@@ -48,4 +75,102 @@ export const Main: React.FC = ({}) => {
   }, []);
 
   return <Recorder sources={sources} paused={paused} log={log} mode={mode} />;
+};
+
+const mergeSourceCodes = (prevSource: Source, newSource: Source): Source => {
+  if (!prevSource.text || !newSource.text)
+    return newSource;
+
+  const prevLines = prevSource.text.split('\n');
+  const newLines = newSource.text.split('\n');
+
+  let prevClosingIndex = -1;
+  let newClosingIndex = -1;
+
+  for (let i = prevLines.length - 1; i >= 0; i--) {
+    if (prevLines[i].includes('});')) {
+      prevClosingIndex = i;
+      break;
+    }
+  }
+
+  for (let i = newLines.length - 1; i >= 0; i--) {
+    if (newLines[i].includes('});')) {
+      newClosingIndex = i;
+      break;
+    }
+  }
+
+  if (prevClosingIndex === -1 || newClosingIndex === -1)
+    return newSource;
+
+  const commands: Array<{line: string; isAssertion: boolean; lineNumber: number}> = [];
+
+  for (let i = 0; i < prevClosingIndex; i++) {
+    const line = prevLines[i].trim();
+    if ((line.includes('expect(') || line.includes('.expect(')) &&
+        (line.includes('.to') || line.includes('.not.to'))) {
+      commands.push({
+        line: prevLines[i],
+        isAssertion: true,
+        lineNumber: i
+      });
+    } else if (line.startsWith('await page.') && line.endsWith(');')) {
+      commands.push({
+        line: prevLines[i],
+        isAssertion: false,
+        lineNumber: i
+      });
+    }
+  }
+
+  const newCommands: Array<{line: string; lineNumber: number}> = [];
+
+  for (let i = 0; i < newClosingIndex; i++) {
+    const line = newLines[i].trim();
+    if (line.startsWith('await page.') && !line.includes('expect(') && line.endsWith(');')) {
+      newCommands.push({
+        line: newLines[i],
+        lineNumber: i
+      });
+    }
+  }
+
+  const result: string[] = [];
+
+  for (let i = 0; i < newLines.length; i++) {
+    if (i < newCommands[0]?.lineNumber || newCommands.length === 0)
+      result.push(newLines[i]);
+    else
+      break;
+
+  }
+
+  let newCommandIndex = 0;
+
+  for (const cmd of commands) {
+    if (!cmd.isAssertion && newCommandIndex < newCommands.length) {
+      result.push(newCommands[newCommandIndex].line);
+      newCommandIndex++;
+    } else if (cmd.isAssertion) {
+      result.push(cmd.line);
+    }
+  }
+
+  while (newCommandIndex < newCommands.length) {
+    result.push(newCommands[newCommandIndex].line);
+    newCommandIndex++;
+  }
+
+  for (let i = newClosingIndex; i < newLines.length; i++)
+    result.push(newLines[i]);
+
+
+  return {
+    ...newSource,
+    text: result.join('\n'),
+    highlight: commands.some(cmd => cmd.isAssertion)
+      ? [...(newSource.highlight || []), { line: newClosingIndex - 1, type: 'running' }]
+      : newSource.highlight
+  };
 };

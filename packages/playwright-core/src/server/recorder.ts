@@ -52,6 +52,7 @@ export class Recorder implements InstrumentationListener, IRecorder {
   private _contextRecorder: ContextRecorder;
   private _omitCallTracking = false;
   private _currentLanguage: Language;
+  private _userAssertions: { code: string, position: number }[] = [];
 
   static async showInspector(context: BrowserContext, params: channels.BrowserContextEnableRecorderParams, recorderAppFactory: IRecorderAppFactory) {
     if (isUnderTest())
@@ -132,6 +133,10 @@ export class Recorder implements InstrumentationListener, IRecorder {
       }
       if (data.event === 'clear') {
         this._contextRecorder.clearScript();
+        return;
+      }
+      if (data.event === 'addCode') {
+        this.addUserAssertion(data.params.code);
         return;
       }
       if (data.event === 'runTask') {
@@ -292,10 +297,8 @@ export class Recorder implements InstrumentationListener, IRecorder {
   }
 
   private _refreshOverlay() {
-    for (const page of this._context.pages()) {
-      for (const frame of page.frames())
-        frame.evaluateExpression('window.__pw_refreshOverlay()').catch(() => {});
-    }
+    for (const page of this._context.pages())
+      page.mainFrame().evaluateExpression('window.__pw_refreshOverlay()').catch(() => {});
   }
 
   async onBeforeCall(sdkObject: SdkObject, metadata: CallMetadata) {
@@ -387,6 +390,48 @@ export class Recorder implements InstrumentationListener, IRecorder {
       return fs.readFileSync(fileName, 'utf-8');
     } catch (e) {
       return '// No source available';
+    }
+  }
+
+  addUserAssertion(code: string) {
+    this._userAssertions.push({ code, position: -1 });
+    this._updateSources();
+  }
+
+  private _updateSources() {
+    if (this._recorderSources.length > 0 && this._userAssertions.length > 0) {
+      const updatedSources = this._recorderSources.map((source, sourceIndex) => {
+        const lines = source.text.split('\n');
+
+        let insertPosition = -1;
+        for (let i = lines.length - 1; i >= 0; i--) {
+          if (lines[i].includes('});')) {
+            insertPosition = i;
+            break;
+          }
+        }
+
+        if (insertPosition >= 0) {
+          const newLines = [...lines];
+
+          this._userAssertions.forEach(assertion => {
+            newLines.splice(insertPosition, 0, `  ${assertion.code}`);
+          });
+
+          const updatedSource = {
+            ...source,
+            text: newLines.join('\n'),
+            revealLine: insertPosition
+          };
+
+          return updatedSource;
+        }
+
+        return source;
+      });
+
+      this._recorderSources = updatedSources;
+      this._pushAllSources();
     }
   }
 }

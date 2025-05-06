@@ -1,0 +1,188 @@
+.assertion-parameters-form {
+  background-color: var(--vscode-editor-background);
+  border-radius: 6px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.form-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: var(--vscode-editor-foreground);
+}
+
+.form-description {
+  font-size: 14px;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 16px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.param-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--vscode-editor-foreground);
+}
+
+.param-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--vscode-input-border);
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.param-input:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder);
+}
+
+.required {
+  color: var(--vscode-errorForeground);
+  margin-left: 4px;
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+}
+
+.param-checkbox {
+  margin-right: 8px;
+}
+
+.regexp-container {
+  display: flex;
+  align-items: center;
+}
+
+.regexp-prefix,
+.regexp-suffix {
+  font-size: 14px;
+  color: var(--vscode-editor-foreground);
+  padding: 0 4px;
+}
+
+.regexp-input {
+  flex: 1;
+}
+
+.selector-display {
+  padding: 8px;
+  background-color: var(--vscode-editor-inactiveSelectionBackground);
+  border-radius: 4px;
+  font-family: monospace;
+  color: var(--vscode-editor-foreground);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.current-value-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.current-value {
+  padding: 8px;
+  background-color: var(--vscode-editor-inactiveSelectionBackground);
+  border-radius: 4px;
+  font-family: monospace;
+  word-break: break-all;
+  margin-bottom: 8px;
+}
+
+.current-value-input {
+  width: 100%;
+  padding: 8px;
+  background-color: var(--vscode-editor-inactiveSelectionBackground);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  font-family: monospace;
+  color: var(--vscode-editor-foreground);
+  margin-bottom: 8px;
+}
+
+.current-value-input:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder);
+}
+
+.use-current-value {
+  display: flex;
+  align-items: center;
+}
+
+.use-current-value input {
+  margin-right: 8px;
+}
+
+.code-preview {
+  margin-top: 24px;
+  margin-bottom: 24px;
+  background-color: var(--vscode-editor-inactiveSelectionBackground);
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.code-preview h4 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.code-preview pre {
+  margin: 0;
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--vscode-editor-foreground);
+  font-size: 13px;
+}
+
+.form-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.cancel-button,
+.submit-button {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.cancel-button {
+  background-color: transparent;
+  border: 1px solid var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+
+.cancel-button:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.submit-button {
+  background-color: var(--vscode-button-background);
+  border: none;
+  color: var(--vscode-button-foreground);
+}
+
+.submit-button:hover {
+  background-color: var(--vscode-button-hoverBackground);
+} 

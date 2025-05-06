@@ -28,8 +28,9 @@ import './recorder.css';
 import { asLocator } from '@isomorphic/locatorGenerators';
 import { toggleTheme } from '@web/theme';
 import { copy, useSetting } from '@web/uiUtils';
-import yaml from 'yaml';
+import * as yaml from 'yaml';
 import { parseAriaSnapshot } from '@isomorphic/ariaSnapshot';
+import { AssertionManager } from './components/AssertionManager';
 
 export interface RecorderProps {
   sources: Source[],
@@ -50,6 +51,13 @@ export const Recorder: React.FC<RecorderProps> = ({
   const [ariaSnapshot, setAriaSnapshot] = React.useState<string | undefined>();
   const [ariaSnapshotErrors, setAriaSnapshotErrors] = React.useState<SourceHighlight[]>();
 
+  // 검증 관련 상태
+  const [showAssertionManager, setShowAssertionManager] = React.useState(false);
+  const [elementInfo, setElementInfo] = React.useState<ElementInfo | undefined>();
+  const [elementContent, setElementContent] = React.useState<string | undefined>();
+  const [elementType, setElementType] = React.useState<string | undefined>();
+  const [isVerifyingMode, setIsVerifyingMode] = React.useState(false);
+
   const fileId = selectedFileId || runningFileId || sources[0]?.id;
 
   const source = React.useMemo(() => {
@@ -62,19 +70,53 @@ export const Recorder: React.FC<RecorderProps> = ({
   }, [sources, fileId]);
 
   const [locator, setLocator] = React.useState('');
+
+  // 요소 선택 처리 함수 확장
   window.playwrightElementPicked = (elementInfo: ElementInfo, userGesture?: boolean) => {
     const language = source.language;
     setLocator(asLocator(language, elementInfo.selector));
     setAriaSnapshot(elementInfo.ariaSnapshot);
     setAriaSnapshotErrors([]);
+
+    // 새로운 요소 정보 저장
+    setElementInfo(elementInfo);
+
+    // 가능하면 요소 내용과 타입 추출
+    extractElementDetails(elementInfo).then(details => {
+      setElementContent(details.content);
+      setElementType(details.type);
+    });
+
     if (userGesture && selectedTab !== 'locator' && selectedTab !== 'aria')
       setSelectedTab('locator');
 
-    if (mode === 'inspecting' && selectedTab === 'aria') {
-      // Keep exploring aria.
+    // 검증 모드 처리
+    if (isVerifyingMode) {
+      setShowAssertionManager(true);
+      setIsVerifyingMode(false);
+      // 검증 모드 종료 후 recording 모드로 전환
+      window.dispatch({
+        event: 'setMode',
+        params: { mode: 'recording' }
+      }).catch(() => {});
+    } else if (mode === 'inspecting' && selectedTab === 'aria') {
+      // aria 탭 탐색 계속
     } else {
-      window.dispatch({ event: 'setMode', params: { mode: mode === 'inspecting' ? 'standby' : 'recording' } }).catch(() => { });
+      window.dispatch({
+        event: 'setMode',
+        params: { mode: mode === 'inspecting' ? 'standby' : 'recording' }
+      }).catch(() => {});
     }
+  };
+
+  // 요소 정보에서 내용과 타입 추출
+  const extractElementDetails = async (info: ElementInfo): Promise<{content?: string, type?: string}> => {
+    // 실제 구현에서는 브라우저에서 내용을 가져오는 API 호출이 필요
+    // 여기서는 간단한 예시 구현
+    return {
+      content: '샘플 텍스트 내용',  // 실제로는 요소의 텍스트 내용
+      type: 'div'                  // 실제로는 요소의 태그 이름
+    };
   };
 
   window.playwrightSetRunningFile = setRunningFileId;
@@ -116,6 +158,7 @@ export const Recorder: React.FC<RecorderProps> = ({
   const onAriaEditorChange = React.useCallback((ariaSnapshot: string) => {
     if (mode === 'none' || mode === 'inspecting')
       window.dispatch({ event: 'setMode', params: { mode: 'standby' } });
+    // @ts-ignore
     const { fragment, errors } = parseAriaSnapshot(yaml, ariaSnapshot, { prettyErrors: false });
     const highlights = errors.map(error => {
       const highlight: SourceHighlight = {
@@ -132,61 +175,112 @@ export const Recorder: React.FC<RecorderProps> = ({
       window.dispatch({ event: 'highlightRequested', params: { ariaTemplate: fragment } });
   }, [mode]);
 
+  // 검증 시작 함수
+  const startVerification = React.useCallback(() => {
+    setIsVerifyingMode(true);
+    // 검사 모드로 전환
+    window.dispatch({
+      event: 'setMode',
+      params: { mode: 'inspecting' }
+    }).catch(() => {});
+  }, []);
+
+  // 검증 추가 처리 함수
+  const handleAddAssertion = React.useCallback((code: string) => {
+    // 소스 배열에서 현재 선택된 소스를 찾습니다
+    const currentSource = sources.find(s => s.id === fileId);
+
+    if (currentSource && currentSource.text) {
+      const lines = currentSource.text.split('\n');
+
+      // 마지막 '});' 이전에 코드 추가
+      let lastCodeLineIndex = -1;
+      for (let i = lines.length - 1; i >= 0; i--) {
+        if (lines[i].includes('});')) {
+          lastCodeLineIndex = i;
+          break;
+        }
+      }
+
+      if (lastCodeLineIndex >= 0) {
+        // 새 코드를 추가하고 적절한 들여쓰기 적용
+        lines.splice(lastCodeLineIndex, 0, `  ${code}`);
+
+        // 원본 소스 배열에서 수정된 소스만 업데이트
+        const updatedSources = sources.map(s =>
+          s.id === currentSource.id
+            ? {
+              ...s,
+              text: lines.join('\n'),
+              revealLine: lastCodeLineIndex
+            }
+            : s
+        );
+
+        // 수정된 소스 배열로 업데이트 - window.playwrightSetSources 직접 호출
+        window.playwrightSetSources(updatedSources, undefined);
+      }
+    }
+
+    // 검증 UI 닫기
+    setShowAssertionManager(false);
+  }, [sources, fileId]);
+
   return <div className='recorder'>
     <Toolbar>
-      <ToolbarButton icon='circle-large-filled' title='Record' toggled={mode === 'recording' || mode === 'recording-inspecting' || mode === 'assertingText' || mode === 'assertingVisibility'} onClick={() => {
+      <ToolbarButton icon='circle-large-filled' title='녹화 시작/중지' toggled={mode === 'recording' || mode === 'recording-inspecting' || mode.startsWith('asserting')} onClick={() => {
         window.dispatch({ event: 'setMode', params: { mode: mode === 'none' || mode === 'standby' || mode === 'inspecting' ? 'recording' : 'standby' } });
-      }}>Record</ToolbarButton>
+      }}>녹화</ToolbarButton>
       <ToolbarSeparator />
-      <ToolbarButton icon='inspect' title='Pick locator' toggled={mode === 'inspecting' || mode === 'recording-inspecting'} onClick={() => {
-        const newMode = {
+      <ToolbarButton icon='inspect' title='요소 선택하기' toggled={mode === 'inspecting' || mode === 'recording-inspecting'} onClick={() => {
+        const newMode: any = {
           'inspecting': 'standby',
           'none': 'inspecting',
           'standby': 'inspecting',
           'recording': 'recording-inspecting',
           'recording-inspecting': 'recording',
-          'assertingText': 'recording-inspecting',
-          'assertingVisibility': 'recording-inspecting',
-          'assertingValue': 'recording-inspecting',
-          'assertingSnapshot': 'recording-inspecting',
-        }[mode];
-        window.dispatch({ event: 'setMode', params: { mode: newMode } }).catch(() => { });
-      }}></ToolbarButton>
-      <ToolbarButton icon='eye' title='Assert visibility' toggled={mode === 'assertingVisibility'} disabled={mode === 'none' || mode === 'standby' || mode === 'inspecting'} onClick={() => {
-        window.dispatch({ event: 'setMode', params: { mode: mode === 'assertingVisibility' ? 'recording' : 'assertingVisibility' } });
-      }}></ToolbarButton>
-      <ToolbarButton icon='whole-word' title='Assert text' toggled={mode === 'assertingText'} disabled={mode === 'none' || mode === 'standby' || mode === 'inspecting'} onClick={() => {
-        window.dispatch({ event: 'setMode', params: { mode: mode === 'assertingText' ? 'recording' : 'assertingText' } });
-      }}></ToolbarButton>
-      <ToolbarButton icon='symbol-constant' title='Assert value' toggled={mode === 'assertingValue'} disabled={mode === 'none' || mode === 'standby' || mode === 'inspecting'} onClick={() => {
-        window.dispatch({ event: 'setMode', params: { mode: mode === 'assertingValue' ? 'recording' : 'assertingValue' } });
-      }}></ToolbarButton>
-      <ToolbarButton icon='gist' title='Assert snapshot' toggled={mode === 'assertingSnapshot'} disabled={mode === 'none' || mode === 'standby' || mode === 'inspecting'} onClick={() => {
-        window.dispatch({ event: 'setMode', params: { mode: mode === 'assertingSnapshot' ? 'recording' : 'assertingSnapshot' } });
-      }}></ToolbarButton>
+        };
+
+        // 모든 asserting 모드에 대해 recording-inspecting으로 변경
+        if (typeof mode === 'string' && mode.startsWith('asserting'))
+          newMode[mode] = 'recording-inspecting';
+
+
+        window.dispatch({ event: 'setMode', params: { mode: newMode[mode] } }).catch(() => { });
+      }}>선택</ToolbarButton>
+
+      {/* 개선된 검증 버튼 */}
+      <ToolbarButton
+        icon='beaker'
+        title='검증 추가 - 요소를 선택한 후 검증 기능을 사용할 수 있습니다'
+        toggled={isVerifyingMode}
+        onClick={startVerification}>
+        검증
+      </ToolbarButton>
+
       <ToolbarSeparator />
-      <ToolbarButton icon='files' title='Copy' disabled={!source || !source.text} onClick={() => {
+      <ToolbarButton icon='files' title='생성된 코드 복사' disabled={!source || !source.text} onClick={() => {
         copy(source.text);
-      }}></ToolbarButton>
-      <ToolbarButton icon='debug-continue' title='Resume (F8)' ariaLabel='Resume' disabled={!paused} onClick={() => {
+      }}>복사</ToolbarButton>
+      <ToolbarButton icon='debug-continue' title='계속 실행 (F8)' ariaLabel='Resume' disabled={!paused} onClick={() => {
         window.dispatch({ event: 'resume' });
-      }}></ToolbarButton>
-      <ToolbarButton icon='debug-pause' title='Pause (F8)' ariaLabel='Pause' disabled={paused} onClick={() => {
+      }}>계속</ToolbarButton>
+      <ToolbarButton icon='debug-pause' title='일시 중지 (F8)' ariaLabel='Pause' disabled={paused} onClick={() => {
         window.dispatch({ event: 'pause' });
-      }}></ToolbarButton>
-      <ToolbarButton icon='debug-step-over' title='Step over (F10)' ariaLabel='Step over' disabled={!paused} onClick={() => {
+      }}>일시정지</ToolbarButton>
+      <ToolbarButton icon='debug-step-over' title='한 단계 실행 (F10)' ariaLabel='Step over' disabled={!paused} onClick={() => {
         window.dispatch({ event: 'step' });
-      }}></ToolbarButton>
+      }}>단계 실행</ToolbarButton>
       <div style={{ flex: 'auto' }}></div>
-      <div>Target:</div>
+      <div>대상:</div>
       <SourceChooser fileId={fileId} sources={sources} setFileId={fileId => {
         setSelectedFileId(fileId);
         window.dispatch({ event: 'fileChanged', params: { file: fileId } });
       }} />
-      <ToolbarButton icon='clear-all' title='Clear' disabled={!source || !source.text} onClick={() => {
+      <ToolbarButton icon='clear-all' title='기록된 내용 지우기' disabled={!source || !source.text} onClick={() => {
         window.dispatch({ event: 'clear' });
-      }}></ToolbarButton>
-      <ToolbarButton icon='color-mode' title='Toggle color mode' toggled={false} onClick={() => toggleTheme()}></ToolbarButton>
+      }}>초기화</ToolbarButton>
+      <ToolbarButton icon='color-mode' title='테마 변경' toggled={false} onClick={() => toggleTheme()}>테마</ToolbarButton>
     </Toolbar>
     <SplitView
       sidebarSize={200}
@@ -196,23 +290,35 @@ export const Recorder: React.FC<RecorderProps> = ({
         tabs={[
           {
             id: 'locator',
-            title: 'Locator',
-            render: () => <CodeMirrorWrapper text={locator} placeholder='Type locator to inspect' language={source.language} focusOnChange={true} onChange={onEditorChange} wrapLines={true} />
+            title: '선택자',
+            render: () => <CodeMirrorWrapper text={locator} placeholder='선택자를 입력하여 검사' language={source.language} focusOnChange={true} onChange={onEditorChange} wrapLines={true} />
           },
           {
             id: 'log',
-            title: 'Log',
+            title: '로그',
             render: () => <CallLogView language={source.language} log={Array.from(log.values())} />
           },
           {
             id: 'aria',
             title: 'Aria',
-            render: () => <CodeMirrorWrapper text={ariaSnapshot || ''} placeholder='Type aria template to match' language={'yaml'} onChange={onAriaEditorChange} highlight={ariaSnapshotErrors} wrapLines={true} />
+            render: () => <CodeMirrorWrapper text={ariaSnapshot || ''} placeholder='Aria 템플릿을 입력하여 매칭' language={'yaml'} onChange={onAriaEditorChange} highlight={ariaSnapshotErrors} wrapLines={true} />
           },
         ]}
         selectedTab={selectedTab}
         setSelectedTab={setSelectedTab}
       />}
+    />
+
+    {/* 검증 매니저 컴포넌트 */}
+    <AssertionManager
+      isOpen={showAssertionManager}
+      selector={locator}
+      rawSelector={elementInfo?.selector}
+      elementInfo={elementInfo}
+      currentValue={elementContent}
+      elementType={elementType}
+      onClose={() => setShowAssertionManager(false)}
+      onAddAssertion={handleAddAssertion}
     />
   </div>;
 };
