@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-import { ManualPromise, monotonicTime } from 'playwright-core/lib/utils';
-import { colors } from 'playwright-core/lib/utils';
+import { ManualPromise, monotonicTime } from 'shopby-playwright-core/lib/utils';
+import { colors } from 'shopby-playwright-core/lib/utils';
 
 import { debugTest, formatLocation } from '../util';
 

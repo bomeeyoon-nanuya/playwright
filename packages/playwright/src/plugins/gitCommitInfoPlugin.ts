@@ -16,7 +16,7 @@
 
 import * as fs from 'fs';
 
-import { monotonicTime, spawnAsync } from 'playwright-core/lib/utils';
+import { monotonicTime, spawnAsync } from 'shopby-playwright-core/lib/utils';
 
 import type { TestRunnerPlugin } from './';
 import type { FullConfig } from '../../types/testReporter';

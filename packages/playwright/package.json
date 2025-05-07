@@ -1,10 +1,10 @@
 {
-  "name": "playwright",
-  "version": "1.52.0",
-  "description": "A high-level API to automate web browsers",
+  "name": "shopby-playwright",
+  "version": "1.0.12",
+  "description": "ShopBy의 Playwright 기반 테스트 라이브러리",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/microsoft/playwright.git"
+    "url": "git+https://github.com/bomeeyoon-nanuya/playwright.git"
   },
   "homepage": "https://playwright.dev",
   "engines": {
@@ -49,14 +49,14 @@
     }
   },
   "bin": {
-    "playwright": "cli.js"
+    "shopby-playwright": "cli.js"
   },
   "author": {
     "name": "Microsoft Corporation"
   },
   "license": "Apache-2.0",
   "dependencies": {
-    "playwright-core": "1.52.0"
+    "shopby-playwright-core": "1.0.0"
   },
   "optionalDependencies": {
     "fsevents": "2.3.2"

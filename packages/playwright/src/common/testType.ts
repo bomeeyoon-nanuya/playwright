@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-import { errors } from 'playwright-core';
-import { getPackageManagerExecCommand, monotonicTime, raceAgainstDeadline, currentZone } from 'playwright-core/lib/utils';
+import { errors } from 'shopby-playwright-core';
+import { getPackageManagerExecCommand, monotonicTime, raceAgainstDeadline, currentZone } from 'shopby-playwright-core/lib/utils';
 
 import { currentTestInfo, currentlyLoadingFileSuite, setCurrentlyLoadingFileSuite } from './globals';
 import { Suite, TestCase } from './test';

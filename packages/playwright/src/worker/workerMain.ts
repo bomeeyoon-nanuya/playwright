@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-import { ManualPromise, gracefullyCloseAll, removeFolders } from 'playwright-core/lib/utils';
-import { colors } from 'playwright-core/lib/utils';
+import { ManualPromise, gracefullyCloseAll, removeFolders } from 'shopby-playwright-core/lib/utils';
+import { colors } from 'shopby-playwright-core/lib/utils';
 
 import { deserializeConfig } from '../common/configLoader';
 import { setCurrentTestInfo, setIsWorkerProcess } from '../common/globals';

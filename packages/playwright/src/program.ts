@@ -19,12 +19,12 @@
 import fs from 'fs';
 import path from 'path';
 
-import { program } from 'playwright-core/lib/cli/program';
-import { gracefullyProcessExitDoNotHang, startProfiling, stopProfiling } from 'playwright-core/lib/utils';
+import { program } from 'shopby-playwright-core/lib/cli/program';
+import { gracefullyProcessExitDoNotHang, startProfiling, stopProfiling } from 'shopby-playwright-core/lib/utils';
 
 import { builtInReporters, defaultReporter, defaultTimeout } from './common/config';
 import { loadConfigFromFileRestartIfNeeded, loadEmptyConfigForMergeReports, resolveConfigLocation } from './common/configLoader';
-export { program } from 'playwright-core/lib/cli/program';
+export { program } from 'shopby-playwright-core/lib/cli/program';
 import { prepareErrorStack } from './reporters/base';
 import { showHTMLReport } from './reporters/html';
 import { createMergedReport } from './reporters/merge';
@@ -38,7 +38,7 @@ import type { TestError } from '../types/testReporter';
 import type { ConfigCLIOverrides } from './common/ipc';
 import type { TraceMode } from '../types/test';
 import type { ReporterDescription } from '../types/test';
-import type { Command } from 'playwright-core/lib/utilsBundle';
+import type { Command } from 'shopby-playwright-core/lib/utilsBundle';
 
 function addTestCommand(program: Command) {
   const command = program.command('test [test-filter...]');

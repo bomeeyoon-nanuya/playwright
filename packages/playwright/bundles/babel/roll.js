@@ -1,4 +1,4 @@
-const { chromium } = require('playwright');
+const { chromium } = require('shopby-playwright');
 
 (async () => {
   const browser = await chromium.launch();
@@ -11,7 +11,7 @@ const { chromium } = require('playwright');
     const title = await page.getByText('Public').locator('..').textContent();
     if (!title.startsWith(dep))
       throw new Error('Malformed title: ', title);
-    const i = title.indexOf(' • Public');
+    const i = title.indexOf(' • Public');
     if (i === -1)
       throw new Error('Malformed title: ' + title);
     const version = title.slice(dep.length, i);

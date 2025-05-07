@@ -17,8 +17,8 @@
 import child_process from 'child_process';
 import { EventEmitter } from 'events';
 
-import { assert, timeOrigin } from 'playwright-core/lib/utils';
-import { debug } from 'playwright-core/lib/utilsBundle';
+import { assert, timeOrigin } from 'shopby-playwright-core/lib/utils';
+import { debug } from 'shopby-playwright-core/lib/utilsBundle';
 
 import { esmLoaderRegistered } from '../common/esmLoaderHost';
 import { execArgvWithExperimentalLoaderOptions } from '../transform/esmUtils';

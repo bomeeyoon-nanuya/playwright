@@ -17,8 +17,8 @@
 import fs from 'fs';
 import path from 'path';
 
-import { gracefullyProcessExitDoNotHang } from 'playwright-core/lib/utils';
-import { isRegExp } from 'playwright-core/lib/utils';
+import { gracefullyProcessExitDoNotHang } from 'shopby-playwright-core/lib/utils';
+import { isRegExp } from 'shopby-playwright-core/lib/utils';
 
 import { requireOrImport, setSingleTSConfig, setTransformConfig } from '../transform/transform';
 import { errorWithFile, fileIsModule } from '../util';

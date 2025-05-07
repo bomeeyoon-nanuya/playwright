@@ -17,8 +17,8 @@
 import fs from 'fs';
 import path from 'path';
 
-import * as playwrightLibrary from 'playwright-core';
-import { setBoxedStackPrefixes, asLocator, createGuid, currentZone, debugMode, isString, jsonStringifyForceASCII } from 'playwright-core/lib/utils';
+import * as playwrightLibrary from 'shopby-playwright-core';
+import { setBoxedStackPrefixes, asLocator, createGuid, currentZone, debugMode, isString, jsonStringifyForceASCII } from 'shopby-playwright-core/lib/utils';
 
 import { currentTestInfo } from './common/globals';
 import { rootTestType } from './common/testType';
@@ -27,9 +27,9 @@ import { attachErrorContext } from './errorContext';
 import type { Fixtures, PlaywrightTestArgs, PlaywrightTestOptions, PlaywrightWorkerArgs, PlaywrightWorkerOptions, ScreenshotMode, TestInfo, TestType, VideoMode } from '../types/test';
 import type { ContextReuseMode } from './common/config';
 import type { TestInfoImpl, TestStepInternal } from './worker/testInfo';
-import type { ApiCallData, ClientInstrumentation, ClientInstrumentationListener } from '../../playwright-core/src/client/clientInstrumentation';
-import type { Playwright as PlaywrightImpl } from '../../playwright-core/src/client/playwright';
-import type { APIRequestContext, Browser, BrowserContext, BrowserContextOptions, LaunchOptions, Page, Tracing, Video } from 'playwright-core';
+import type { ApiCallData, ClientInstrumentation, ClientInstrumentationListener } from '../../shopby-playwright-core/src/client/clientInstrumentation';
+import type { Playwright as PlaywrightImpl } from '../../shopby-playwright-core/src/client/playwright';
+import type { APIRequestContext, Browser, BrowserContext, BrowserContextOptions, LaunchOptions, Page, Tracing, Video } from 'shopby-playwright-core';
 
 export { expect } from './matchers/expect';
 export const _baseTest: TestType<{}, {}> = rootTestType.test;
@@ -70,7 +70,7 @@ const playwrightFixtures: Fixtures<TestFixtures, WorkerFixtures> = ({
   defaultBrowserType: ['chromium', { scope: 'worker', option: true }],
   browserName: [({ defaultBrowserType }, use) => use(defaultBrowserType), { scope: 'worker', option: true }],
   playwright: [async ({}, use) => {
-    await use(require('playwright-core'));
+    await use(require('shopby-playwright-core'));
   }, { scope: 'worker', box: true }],
   headless: [({ launchOptions }, use) => use(launchOptions.headless ?? true), { scope: 'worker', option: true }],
   channel: [({ launchOptions }, use) => use(launchOptions.channel), { scope: 'worker', option: true }],

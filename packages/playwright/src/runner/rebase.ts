@@ -18,9 +18,9 @@ import fs from 'fs';
 import path from 'path';
 
 
-import { MultiMap } from 'playwright-core/lib/utils';
-import { colors } from 'playwright-core/lib/utils';
-import { diff } from 'playwright-core/lib/utilsBundle';
+import { MultiMap } from 'shopby-playwright-core/lib/utils';
+import { colors } from 'shopby-playwright-core/lib/utils';
+import { diff } from 'shopby-playwright-core/lib/utilsBundle';
 
 import { filterProjects } from './projectUtils';
 import { babelParse, traverse, types } from '../transform/babelBundle';

@@ -16,7 +16,7 @@
 
 import fs from 'fs';
 
-import { monotonicTime } from 'playwright-core/lib/utils';
+import { monotonicTime } from 'shopby-playwright-core/lib/utils';
 
 import { internalScreen, prepareErrorStack, relativeFilePath } from './base';
 import { Multiplexer } from './multiplexer';

@@ -17,7 +17,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { getAsBooleanFromENV } from 'playwright-core/lib/utils';
+import { getAsBooleanFromENV } from 'shopby-playwright-core/lib/utils';
 
 import { formatFailure, nonTerminalScreen, resolveOutputFile } from './base';
 import { stripAnsiEscapes } from '../util';

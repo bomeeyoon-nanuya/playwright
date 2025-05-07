@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { setTimeOrigin, startProfiling, stopProfiling } from 'playwright-core/lib/utils';
+import { setTimeOrigin, startProfiling, stopProfiling } from 'shopby-playwright-core/lib/utils';
 
 import { serializeError } from '../util';
 import { registerESMLoader } from './esmLoaderHost';

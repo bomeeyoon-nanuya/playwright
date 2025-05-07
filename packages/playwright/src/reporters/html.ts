@@ -18,11 +18,11 @@ import fs from 'fs';
 import path from 'path';
 import { Transform } from 'stream';
 
-import { HttpServer, MultiMap, assert, calculateSha1, getPackageManagerExecCommand, copyFileAndMakeWritable, gracefullyProcessExitDoNotHang, removeFolders, sanitizeForFilePath, toPosixPath } from 'playwright-core/lib/utils';
-import { colors } from 'playwright-core/lib/utils';
-import { open } from 'playwright-core/lib/utilsBundle';
-import { mime } from 'playwright-core/lib/utilsBundle';
-import { yazl } from 'playwright-core/lib/zipBundle';
+import { HttpServer, MultiMap, assert, calculateSha1, getPackageManagerExecCommand, copyFileAndMakeWritable, gracefullyProcessExitDoNotHang, removeFolders, sanitizeForFilePath, toPosixPath } from 'shopby-playwright-core/lib/utils';
+import { colors } from 'shopby-playwright-core/lib/utils';
+import { open } from 'shopby-playwright-core/lib/utilsBundle';
+import { mime } from 'shopby-playwright-core/lib/utilsBundle';
+import { yazl } from 'shopby-playwright-core/lib/zipBundle';
 
 import { formatError, formatResultFailure, internalScreen } from './base';
 import { codeFrameColumns } from '../transform/babelBundle';
@@ -32,7 +32,7 @@ import type { ReporterV2 } from './reporterV2';
 import type { Metadata } from '../../types/test';
 import type * as api from '../../types/testReporter';
 import type { HTMLReport, Stats, TestAttachment, TestCase, TestCaseSummary, TestFile, TestFileSummary, TestResult, TestStep, TestAnnotation } from '@html-reporter/types';
-import type { ZipFile } from 'playwright-core/lib/zipBundle';
+import type { ZipFile } from 'shopby-playwright-core/lib/zipBundle';
 import type { TransformCallback } from 'stream';
 
 type TestEntry = {
@@ -338,12 +338,12 @@ class HtmlBuilder {
     }
 
     // Copy app.
-    const appFolder = path.join(require.resolve('playwright-core'), '..', 'lib', 'vite', 'htmlReport');
+    const appFolder = path.join(require.resolve('shopby-playwright-core'), '..', 'lib', 'vite', 'htmlReport');
     await copyFileAndMakeWritable(path.join(appFolder, 'index.html'), path.join(this._reportFolder, 'index.html'));
 
     // Copy trace viewer.
     if (this._hasTraces) {
-      const traceViewerFolder = path.join(require.resolve('playwright-core'), '..', 'lib', 'vite', 'traceViewer');
+      const traceViewerFolder = path.join(require.resolve('shopby-playwright-core'), '..', 'lib', 'vite', 'traceViewer');
       const traceViewerTargetFolder = path.join(this._reportFolder, 'trace');
       const traceViewerAssetsTargetFolder = path.join(traceViewerTargetFolder, 'assets');
       fs.mkdirSync(traceViewerAssetsTargetFolder, { recursive: true });

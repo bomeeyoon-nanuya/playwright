@@ -19,7 +19,7 @@ import {
   createGuid,
   currentZone,
   isString,
-  pollAgainstDeadline } from 'playwright-core/lib/utils';
+  pollAgainstDeadline } from 'shopby-playwright-core/lib/utils';
 
 import { ExpectError, isJestError } from './matcherHint';
 import {

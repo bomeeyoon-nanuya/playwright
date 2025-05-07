@@ -17,7 +17,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { ZipFile } from 'playwright-core/lib/utils';
+import { ZipFile } from 'shopby-playwright-core/lib/utils';
 
 import {  currentBlobReportVersion } from './blob';
 import { Multiplexer } from './multiplexer';

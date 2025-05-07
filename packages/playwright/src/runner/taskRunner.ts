@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-import { ManualPromise, monotonicTime } from 'playwright-core/lib/utils';
-import { colors } from 'playwright-core/lib/utils';
-import { debug } from 'playwright-core/lib/utilsBundle';
+import { ManualPromise, monotonicTime } from 'shopby-playwright-core/lib/utils';
+import { colors } from 'shopby-playwright-core/lib/utils';
+import { debug } from 'shopby-playwright-core/lib/utilsBundle';
 
 
 import { SigIntWatcher } from './sigIntWatcher';
