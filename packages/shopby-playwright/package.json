@@ -11,6 +11,9 @@
     "node": ">=18"
   },
   "main": "index.js",
+  "bin": {
+    "shopby-playwright": "./cli.js"
+  },
   "exports": {
     ".": {
       "types": "./index.d.ts",
