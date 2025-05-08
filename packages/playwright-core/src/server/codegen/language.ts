@@ -25,10 +25,9 @@ export function generateCode(actions: actions.ActionInContext[], languageGenerat
   const actionTexts = actions.map(a => languageGenerator.generateAction(a)).filter(Boolean);
   const text = [header, ...actionTexts, footer].join('\n');
 
-  // 테스트 이름이 있는 경우 "test(..." 문자열을 "test('사용자 지정 이름'..." 으로 변경
   if (options.testName) {
-    const testNamePattern = /test\(['"](test|)['"]?/;
-    const replacedText = text.replace(testNamePattern, `test('${options.testName}'`);
+    const testNamePattern = /test\((['"])(test|)(['"])?(\)|,)/;
+    const replacedText = text.replace(testNamePattern, `test($1${options.testName}$1$4`);
     return { header, footer, actionTexts, text: replacedText };
   }
 
