@@ -148,8 +148,9 @@ export class RecorderApp extends EventEmitter implements IRecorderApp {
   }
 
   async setSources(sources: Source[], primaryPageURL: string | undefined): Promise<void> {
+
     await this._page.mainFrame().evaluateExpression((({ sources, primaryPageURL }: { sources: Source[], primaryPageURL: string | undefined }) => {
-      window.playwrightSetSources(sources, { preserveAssertions: true });
+      window.playwrightSetSources(sources, { primaryPageURL });
     }).toString(), { isFunction: true }, { sources, primaryPageURL }).catch(() => {});
 
     // Testing harness for runCLI mode.

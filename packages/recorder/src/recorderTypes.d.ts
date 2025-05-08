@@ -154,6 +154,7 @@ export type Source = {
   header?: string;
   footer?: string;
   actions?: string[];
+  code?: string;
 };
 
 // 검증 옵션과 관련된 타입 정의
@@ -184,7 +185,10 @@ declare global {
   interface Window {
     playwrightSetMode: (mode: Mode) => void;
     playwrightSetPaused: (paused: boolean) => void;
-    playwrightSetSources: (sources: Source[], options?: string | { preserveAssertions?: boolean }) => void;
+    playwrightSetSources: (sources: Source[], options?: {
+      primaryPageURL?: string;
+      preserveSources?: boolean;
+    }) => void;
     playwrightSetOverlayVisible: (visible: boolean) => void;
     playwrightUpdateLogs: (callLogs: CallLog[]) => void;
     playwrightSetRunningFile: (file: string | undefined) => void;

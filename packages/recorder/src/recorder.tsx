@@ -31,6 +31,7 @@ import { copy, useSetting } from '@web/uiUtils';
 import * as yaml from 'yaml';
 import { parseAriaSnapshot } from '@isomorphic/ariaSnapshot';
 import { AssertionManager } from './components/AssertionManager';
+import { WaitManager } from './components/WaitManager';
 
 export interface RecorderProps {
   sources: Source[],
@@ -53,10 +54,12 @@ export const Recorder: React.FC<RecorderProps> = ({
 
   // 검증 관련 상태
   const [showAssertionManager, setShowAssertionManager] = React.useState(false);
+  const [showWaitManager, setShowWaitManager] = React.useState(false);
   const [elementInfo, setElementInfo] = React.useState<ElementInfo | undefined>();
   const [elementContent, setElementContent] = React.useState<string | undefined>();
   const [elementType, setElementType] = React.useState<string | undefined>();
   const [isVerifyingMode, setIsVerifyingMode] = React.useState(false);
+  const [isWaitMode, setIsWaitMode] = React.useState(false);
 
   const fileId = selectedFileId || runningFileId || sources[0]?.id;
 
@@ -187,43 +190,40 @@ export const Recorder: React.FC<RecorderProps> = ({
 
   // 검증 추가 처리 함수
   const handleAddAssertion = React.useCallback((code: string) => {
-    // 소스 배열에서 현재 선택된 소스를 찾습니다
     const currentSource = sources.find(s => s.id === fileId);
 
-    if (currentSource && currentSource.text) {
-      const lines = currentSource.text.split('\n');
+    if (!currentSource)
+      return;
 
-      // 마지막 '});' 이전에 코드 추가
-      let lastCodeLineIndex = -1;
-      for (let i = lines.length - 1; i >= 0; i--) {
-        if (lines[i].includes('});')) {
-          lastCodeLineIndex = i;
-          break;
-        }
-      }
-
-      if (lastCodeLineIndex >= 0) {
-        // 새 코드를 추가하고 적절한 들여쓰기 적용
-        lines.splice(lastCodeLineIndex, 0, `  ${code}`);
-
-        // 원본 소스 배열에서 수정된 소스만 업데이트
-        const updatedSources = sources.map(s =>
-          s.id === currentSource.id
-            ? {
-              ...s,
-              text: lines.join('\n'),
-              revealLine: lastCodeLineIndex
-            }
-            : s
-        );
-
-        // 수정된 소스 배열로 업데이트 - window.playwrightSetSources 직접 호출
-        window.playwrightSetSources(updatedSources, undefined);
-      }
-    }
+    window.playwrightSetSources([{
+      ...currentSource,
+      actions: [...(currentSource.actions ?? []), code],
+    }]);
 
     // 검증 UI 닫기
     setShowAssertionManager(false);
+  }, [sources, fileId]);
+
+  // 대기 시작 함수
+  const startWaiting = React.useCallback(() => {
+    setIsWaitMode(true);
+    setShowWaitManager(true);
+  }, []);
+
+  // 대기 추가 처리 함수
+  const handleAddWait = React.useCallback((code: string) => {
+    const currentSource = sources.find(s => s.id === fileId);
+
+    if (!currentSource)
+      return;
+
+    window.playwrightSetSources([{
+      ...currentSource,
+      actions: [...(currentSource.actions ?? []), code],
+    }]);
+
+    // 대기 UI 닫기
+    setShowWaitManager(false);
   }, [sources, fileId]);
 
   return <div className='recorder'>
@@ -256,6 +256,15 @@ export const Recorder: React.FC<RecorderProps> = ({
         toggled={isVerifyingMode}
         onClick={startVerification}>
         검증
+      </ToolbarButton>
+
+      {/* 대기 버튼 */}
+      <ToolbarButton
+        icon='clock'
+        title='대기 추가'
+        toggled={isWaitMode}
+        onClick={startWaiting}>
+        대기
       </ToolbarButton>
 
       <ToolbarSeparator />
@@ -319,6 +328,18 @@ export const Recorder: React.FC<RecorderProps> = ({
       elementType={elementType}
       onClose={() => setShowAssertionManager(false)}
       onAddAssertion={handleAddAssertion}
+    />
+
+    {/* 대기 매니저 컴포넌트 */}
+    <WaitManager
+      isOpen={showWaitManager}
+      selector={locator}
+      rawSelector={elementInfo?.selector}
+      elementInfo={elementInfo}
+      currentValue={elementContent}
+      elementType={elementType}
+      onClose={() => setShowWaitManager(false)}
+      onAddWait={handleAddWait}
     />
   </div>;
 };

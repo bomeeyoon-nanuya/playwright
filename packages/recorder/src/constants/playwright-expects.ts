@@ -363,8 +363,23 @@ export const EXPECT_OPTIONS: ExpectOption[] = [
 // 대기 관련 구문
 export const WAIT_OPTIONS: ExpectOption[] = [
   {
+    id: 'waitForSelector',
+    name: '요소 대기',
+    description: '요소가 나타날 때까지 대기합니다',
+    syntax: 'await page.waitForSelector(selector);',
+    category: 'wait',
+    params: [
+      {
+        name: 'selector',
+        type: 'selector',
+        required: true,
+        description: '대기할 요소 선택자',
+      }
+    ]
+  },
+  {
     id: 'waitForTimeout',
-    name: '지정 시간 대기',
+    name: '시간 대기',
     description: '지정된 시간(밀리초) 동안 대기합니다',
     syntax: 'await page.waitForTimeout(timeout);',
     category: 'wait',
@@ -379,24 +394,9 @@ export const WAIT_OPTIONS: ExpectOption[] = [
     ]
   },
   {
-    id: 'waitForSelector',
-    name: '요소 표시 대기',
-    description: '특정 선택자가 표시될 때까지 대기합니다',
-    syntax: 'await page.waitForSelector(selector);',
-    category: 'wait',
-    params: [
-      {
-        name: 'selector',
-        type: 'selector',
-        required: true,
-        description: '대기할 요소의 선택자'
-      }
-    ]
-  },
-  {
     id: 'waitForLoadState',
     name: '페이지 로드 대기',
-    description: '페이지 로드 상태까지 대기합니다',
+    description: '페이지가 특정 로드 상태에 도달할 때까지 대기합니다',
     syntax: 'await page.waitForLoadState(state);',
     category: 'wait',
     params: [
@@ -404,8 +404,30 @@ export const WAIT_OPTIONS: ExpectOption[] = [
         name: 'state',
         type: 'string',
         required: true,
-        description: '로드 상태 (load, domcontentloaded, networkidle)',
+        description: '대기할 로드 상태(load, domcontentloaded, networkidle)',
         defaultValue: 'load'
+      }
+    ]
+  },
+  {
+    id: 'waitForNavigation',
+    name: '네비게이션 대기',
+    description: '페이지 네비게이션이 완료될 때까지 대기합니다',
+    syntax: 'await page.waitForNavigation();',
+    category: 'wait'
+  },
+  {
+    id: 'waitForFunction',
+    name: '함수 대기',
+    description: '특정 자바스크립트 함수가 true를 반환할 때까지 대기합니다',
+    syntax: 'await page.waitForFunction(() => { return document.querySelectorAll(selector).length > 0; });',
+    category: 'wait',
+    params: [
+      {
+        name: 'selector',
+        type: 'selector',
+        required: true,
+        description: '대기할 요소 선택자',
       }
     ]
   }

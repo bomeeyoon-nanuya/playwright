@@ -1,0 +1,138 @@
+/*
+  Copyright (c) Microsoft Corporation.
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+.wait-parameters-form {
+  padding: 0 20px 20px;
+  color: var(--vscode-editor-foreground, #e0e0e0);
+  background-color: var(--vscode-editor-background, #1e1e1e);
+}
+
+.wait-option-header {
+  margin-bottom: 20px;
+}
+
+.wait-option-header h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.wait-option-header p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--vscode-descriptionForeground, #999);
+}
+
+.param-form-container {
+  margin-bottom: 20px;
+}
+
+.param-input-group {
+  margin-bottom: 16px;
+}
+
+.param-input-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.required-indicator {
+  color: var(--vscode-errorForeground, #f48771);
+  margin-left: 4px;
+}
+
+.param-input {
+  width: 100%;
+  padding: 8px 10px;
+  background-color: var(--vscode-input-background, #3c3c3c);
+  color: var(--vscode-input-foreground, #cccccc);
+  border: 1px solid var(--vscode-input-border, #555);
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.param-input:focus {
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+.param-description {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground, #999);
+}
+
+.code-preview-container {
+  margin-bottom: 20px;
+  background-color: var(--vscode-editor-inactiveSelectionBackground, #3a3d41);
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.code-preview-container h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: normal;
+}
+
+.code-preview {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 13px;
+  background-color: var(--vscode-textBlockQuote-background, #252526);
+  color: var(--vscode-textPreformat-foreground, #d7ba7d);
+  padding: 10px;
+  margin: 0;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+.button-container {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid var(--vscode-panel-border, #333);
+}
+
+.cancel-button {
+  padding: 6px 12px;
+  background-color: transparent;
+  color: var(--vscode-button-secondaryForeground, #cccccc);
+  border: 1px solid var(--vscode-button-secondaryBackground, #3a3d41);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cancel-button:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground, #45494e);
+}
+
+.submit-button {
+  padding: 6px 12px;
+  background-color: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, white);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.submit-button:hover {
+  background-color: var(--vscode-button-hoverBackground, #1177bb);
+} 

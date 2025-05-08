@@ -52,6 +52,7 @@ export class Recorder implements InstrumentationListener, IRecorder {
   private _contextRecorder: ContextRecorder;
   private _omitCallTracking = false;
   private _currentLanguage: Language;
+
   private _userAssertions: { code: string, position: number }[] = [];
 
   static async showInspector(context: BrowserContext, params: channels.BrowserContextEnableRecorderParams, recorderAppFactory: IRecorderAppFactory) {
