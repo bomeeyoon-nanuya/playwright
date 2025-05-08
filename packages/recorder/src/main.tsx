@@ -19,6 +19,46 @@ import * as React from 'react';
 import { Recorder } from './recorder';
 import './recorder.css';
 
+// collapseActions 함수의 로직을 참조한 최적화 함수
+const optimizeActions = (actions: string[]): string[] => {
+  if (!actions || actions.length <= 1)
+    return actions || [];
+
+  const result: string[] = [];
+
+  for (const action of actions) {
+    // fill 액션 판별 함수
+    const isFillAction = (act: string) => act.includes('.fill(');
+
+    // 선택자 추출 함수
+    const getSelectorFromFill = (act: string) => {
+      const match = act.match(/await\s+(.*?)\.fill\(/);
+      return match ? match[1].trim() : '';
+    };
+
+    // 이전 액션 확인
+    const lastAction = result[result.length - 1];
+
+    // fill 액션인지 확인
+    if (isFillAction(action) && lastAction && isFillAction(lastAction)) {
+      // 동일한 선택자인지 확인
+      const currentSelector = getSelectorFromFill(action);
+      const lastSelector = getSelectorFromFill(lastAction);
+
+      // 같은 선택자에 대한 fill 액션이면 이전 것을 대체
+      if (currentSelector && lastSelector && currentSelector === lastSelector) {
+        result[result.length - 1] = action;
+        continue;
+      }
+    }
+
+    // 그 외에는 그냥 추가
+    result.push(action);
+  }
+
+  return result;
+};
+
 export const Main: React.FC = ({}) => {
   const [sources, setSources] = React.useState<Source[]>([]);
   const [paused, setPaused] = React.useState(false);
@@ -45,26 +85,72 @@ export const Main: React.FC = ({}) => {
           if (!lastAction)
             return s;
 
-          const updatedActions = [...(prevSource.actions ?? []), lastAction];
-          const updatedRevealLine = Math.max(1, updatedActions.length - 1);
+          // 이전 액션에 새 액션 추가
+          const allActions = [...(prevSource.actions ?? []), lastAction];
 
-          const lines = prevSource.text.split('\n');
-          const insertPosition = lines.length - 1; // 마지막 줄 바로 앞
+          // collapseActions 로직을 활용한 액션 최적화
+          const optimizedActions = optimizeActions(allActions);
 
-          // 모든 액션에 일관된 들여쓰기 적용
-          const INDENT = '  '; // 표준 들여쓰기 크기 (2칸)
-          const trimmedAction = lastAction.trim();
-          const formattedAction = trimmedAction.startsWith('await')
-            ? `${INDENT}${trimmedAction}`  // await로 시작하는 경우 들여쓰기만 추가
-            : `${INDENT}await ${trimmedAction}`; // await가 없는 경우 추가하고 들여쓰기
+          const updatedRevealLine = Math.max(1, optimizedActions.length - 1);
 
-          lines.splice(insertPosition, 0, formattedAction);
+          // 소스코드 재생성
+          const lines = s.text.split('\n');
+
+          // 헤더/푸터와 액션 부분 구분
+          const header: string[] = [];
+          const footer: string[] = [];
+
+          // 테스트 함수 시작 위치
+          const testStartIndex = lines.findIndex(line => line.includes('async'));
+          if (testStartIndex >= 0) {
+            // 헤더는 테스트 함수 시작까지
+            for (let i = 0; i <= testStartIndex; i++)
+              header.push(lines[i]);
+
+
+            // 푸터는 마지막 줄(보통 '});')
+            footer.push(lines[lines.length - 1]);
+          } else {
+            // 파서가 테스트 구조를 인식할 수 없는 경우 원래 방식 사용
+            const insertPosition = lines.length - 1;
+            const INDENT = '  ';
+            const trimmedAction = lastAction.trim();
+            const formattedAction = trimmedAction.startsWith('await')
+              ? `${INDENT}${trimmedAction}`
+              : `${INDENT}await ${trimmedAction}`;
+
+            lines.splice(insertPosition, 0, formattedAction);
+
+            return {
+              ...s,
+              actions: allActions,
+              revealLine: updatedRevealLine,
+              text: lines.join('\n'),
+            };
+          }
+
+          // 새 텍스트 구성: 헤더 + 최적화된 액션 + 푸터
+          const newLines = [...header];
+
+          // 액션 추가 (들여쓰기 포함)
+          const INDENT = '  ';
+          optimizedActions.forEach(action => {
+            const trimmedAction = action.trim();
+            const formattedAction = trimmedAction.startsWith('await')
+              ? `${INDENT}${trimmedAction}`
+              : `${INDENT}await ${trimmedAction}`;
+
+            newLines.push(formattedAction);
+          });
+
+          // 푸터 추가
+          newLines.push(...footer);
 
           return {
             ...s,
-            actions: updatedActions,
+            actions: optimizedActions,
             revealLine: updatedRevealLine,
-            text: lines.join('\n'),
+            text: newLines.join('\n'),
           };
         });
 
