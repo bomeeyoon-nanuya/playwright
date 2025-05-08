@@ -226,6 +226,12 @@ export const Recorder: React.FC<RecorderProps> = ({
     setShowWaitManager(false);
   }, [sources, fileId]);
 
+  React.useEffect(() => {
+    return () => {
+      copy(source.text);
+    };
+  }, [source.text]);
+
   return <div className='recorder'>
     <Toolbar>
       <ToolbarButton icon='circle-large-filled' title='녹화 시작/중지' toggled={mode === 'recording' || mode === 'recording-inspecting' || mode.startsWith('asserting')} onClick={() => {
