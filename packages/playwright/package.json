@@ -1,6 +1,6 @@
 {
   "name": "shopby-playwright",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "ShopBy의 Playwright 기반 테스트 라이브러리",
   "repository": {
     "type": "git",
@@ -56,7 +56,7 @@
   },
   "license": "Apache-2.0",
   "dependencies": {
-    "shopby-playwright-core": "1.0.2"
+    "shopby-playwright-core": "1.0.3"
   },
   "optionalDependencies": {
     "fsevents": "2.3.2"
