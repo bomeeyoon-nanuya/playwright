@@ -104,12 +104,14 @@ export class ContextRecorder extends EventEmitter {
         actions
       });
     });
-    context.on(BrowserContext.Events.BeforeClose, () => {
-      this._throttledOutputFile?.flush();
-    });
-    this._listeners.push(eventsHelper.addEventListener(process, 'exit', () => {
-      this._throttledOutputFile?.flush();
-    }));
+    // context.on(BrowserContext.Events.BeforeClose, () => {
+    //   if (this._throttledOutputFile)
+    //     this._throttledOutputFile.flush();
+    // });
+    // this._listeners.push(eventsHelper.addEventListener(process, 'exit', () => {
+    //   if (this._throttledOutputFile)
+    //     this._throttledOutputFile.flush();
+    // }));
     this.setEnabled(params.mode === 'recording');
   }
 
@@ -120,7 +122,12 @@ export class ContextRecorder extends EventEmitter {
       throw new Error(`\n===============================\nUnsupported language: '${codegenId}'\n===============================\n`);
     languages.delete(primaryLanguage);
     this._orderedLanguages = [primaryLanguage, ...languages];
-    this._throttledOutputFile = outputFile ? new ThrottledFile(outputFile) : null;
+
+    // 싱글톤 인스턴스를 가져오고 파일 경로 설정
+    const throttledFile = ThrottledFile.getInstance();
+    throttledFile.setFilePath(outputFile || null);
+    this._throttledOutputFile = outputFile ? throttledFile : null;
+
     this._collection?.restart();
   }
 

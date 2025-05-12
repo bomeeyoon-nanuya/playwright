@@ -28,6 +28,7 @@ import { runTraceInBrowser, runTraceViewerApp } from '../server/trace/viewer/tra
 import { assert, getPackageManagerExecCommand } from '../utils';
 import { wrapInASCIIBox } from '../server/utils/ascii';
 import { dotenv, program } from '../utilsBundle';
+import { ThrottledFile } from '../server/recorder/throttledFile';
 
 import type { Browser } from '../client/browser';
 import type { BrowserContext } from '../client/browserContext';
@@ -41,6 +42,19 @@ import type { Command } from '../utilsBundle';
 export { program } from '../utilsBundle';
 
 const packageJSON = require('../../package.json');
+
+// CLI 시작 시 ThrottledFile 싱글톤 인스턴스 초기화
+const throttledFile = ThrottledFile.getInstance();
+
+// 명령줄 인수에서 --output 또는 -o 옵션을 찾아 ThrottledFile 초기화
+const args = process.argv.slice(2);
+for (let i = 0; i < args.length; i++) {
+  if ((args[i] === '--output' || args[i] === '-o') && i + 1 < args.length) {
+    const outputPath = path.resolve(args[i + 1]);
+    throttledFile.setFilePath(outputPath);
+    break;
+  }
+}
 
 program
     .version('Version ' + (process.env.PW_CLI_DISPLAY_VERSION || packageJSON.version))
@@ -72,6 +86,11 @@ commandWithOpenOptions('codegen [url]', 'open page and generate code for user ac
       ['--test-id-attribute <attributeName>', 'use the specified attribute to generate data test ID selectors'],
       ['--name <testName>', 'specify test name to be used in the generated code'],
     ]).action(function(url, options) {
+  // --output 옵션이 있을 때 ThrottledFile 초기화
+  if (options.output) {
+    const absolutePath = path.resolve(options.output);
+    ThrottledFile.getInstance().setFilePath(absolutePath);
+  }
   codegen(options, url).catch(logErrorAndExit);
 }).addHelpText('afterAll', `
 Examples:
@@ -577,6 +596,12 @@ async function open(options: Options, url: string | undefined, language: string)
     saveStorage: options.saveStorage,
     handleSIGINT: false,
   });
+
+  // 프로그램 종료 시 모든 ThrottledFile 인스턴스를 리셋
+  process.on('exit', () => {
+    ThrottledFile.getInstance().flush();
+  });
+
   await openPage(context, url);
 }
 
@@ -601,6 +626,12 @@ async function codegen(options: Options & { target: string, output?: string, tes
     handleSIGINT: false,
     testName,
   });
+
+  // 프로그램 종료 시 모든 ThrottledFile 인스턴스를 리셋
+  process.on('exit', () => {
+    ThrottledFile.getInstance().flush();
+  });
+
   await openPage(context, url);
 }
 

@@ -158,6 +158,15 @@ export const Main: React.FC = ({}) => {
       });
 
       window.playwrightSourcesEchoForTest = updatedSources;
+
+      // 수정된 코드
+      try {
+        window.__pw_updateSources(updatedSources);
+      } catch (e) {
+        //
+      }
+
+
       document.title = primaryPageURL
         ? `Playwright Inspector - ${primaryPageURL}`
         : `Playwright Inspector`;

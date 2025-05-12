@@ -24,6 +24,7 @@ import { serverSideCallMetadata } from '../instrumentation';
 import { syncLocalStorageWithSettings } from '../launchApp';
 import { launchApp } from '../launchApp';
 import { ProgressController } from '../progress';
+import { ThrottledFile } from './throttledFile';
 
 import type { BrowserContext } from '../browserContext';
 import type { Page } from '../page';
@@ -83,6 +84,18 @@ export class RecorderApp extends EventEmitter implements IRecorderApp {
     });
 
     await this._page.exposeBinding('dispatch', false, (_, data: any) => this.emit('event', data));
+
+    await this._page.exposeBinding('__pw_updateSources', false, (_, sources) => {
+
+      const text = sources.find((s: Source) => s.id === 'playwright-test')?.text;
+      console.log(sources.find((s: Source) => s.id === 'playwright-test'));
+
+      const throttledFile = ThrottledFile.getInstance();
+
+      throttledFile.setMergedText(text);
+
+      return true;
+    });
 
     this._page.once('close', () => {
       this.emit('close');

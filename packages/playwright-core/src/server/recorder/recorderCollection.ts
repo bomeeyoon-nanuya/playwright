@@ -52,22 +52,31 @@ export class RecorderCollection extends EventEmitter {
   }
 
   addRecordedAction(actionInContext: actions.ActionInContext) {
-    if (['openPage', 'closePage'].includes(actionInContext.action.name)) {
+    if (['openPage'].includes(actionInContext.action.name)) {
       this._actions.push(actionInContext);
       this._fireChange();
       return;
     }
+
+    if (actionInContext.action.name === 'closePage')
+      return;
+
+
     this._addAction(actionInContext).catch(() => {});
   }
 
   private async _addAction(actionInContext: actions.ActionInContext, callback?: () => Promise<void>) {
     if (!this._enabled)
       return;
-    if (actionInContext.action.name === 'openPage' || actionInContext.action.name === 'closePage') {
+    if (actionInContext.action.name === 'openPage') {
       this._actions.push(actionInContext);
       this._fireChange();
       return;
     }
+
+    if (actionInContext.action.name === 'closePage')
+      return;
+
 
     this._actions.push(actionInContext);
     this._fireChange();

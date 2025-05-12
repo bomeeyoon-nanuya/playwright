@@ -72,13 +72,19 @@ export const WaitManager: React.FC<WaitManagerProps> = ({
 
   // 대기 파라미터 입력 후 제출 처리
   const handleSubmitParams = (params: Record<string, any>) => {
+    debugger;
     if (!selectedOption)
       return;
 
     // 최종 대기 코드 생성
     generateWaitCode(selectedOption, selector, params)
         .then(code => {
-        // 생성된 코드를 상위 컴포넌트로 전달
+          console.log(selectedOption);
+          console.log(selector);
+          console.log(params);
+
+          debugger;
+          // 생성된 코드를 상위 컴포넌트로 전달
           onAddWait(code);
           onClose();
         });
