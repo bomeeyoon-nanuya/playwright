@@ -249,7 +249,7 @@ export class ContextRecorder extends EventEmitter {
     await this._collection.performAction(await this._createActionInContext(frame, action));
   }
 
-  private async _recordAction(frame: Frame, action: actions.Action) {
+  async _recordAction(frame: Frame, action: actions.Action) {
     this._collection.addRecordedAction(await this._createActionInContext(frame, action));
   }
 

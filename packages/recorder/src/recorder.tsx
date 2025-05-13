@@ -14,7 +14,7 @@
   limitations under the License.
 */
 
-import type { CallLog, ElementInfo, Mode, Source } from './recorderTypes';
+import type { CallLog, ElementInfo, ExpectOption, Mode, Source } from './recorderTypes';
 import { CodeMirrorWrapper } from '@web/components/codeMirrorWrapper';
 import type { SourceHighlight } from '@web/components/codeMirrorWrapper';
 import { SplitView } from '@web/components/splitView';
@@ -211,15 +211,16 @@ export const Recorder: React.FC<RecorderProps> = ({
   }, []);
 
   // 대기 추가 처리 함수
-  const handleAddWait = React.useCallback((code: string) => {
+  const handleAddWait = React.useCallback((waitData: any) => {
     const currentSource = sources.find(s => s.id === fileId);
 
     if (!currentSource)
       return;
 
+    // 소스에 코드 추가 (UI에 표시)
     window.playwrightSetSources([{
       ...currentSource,
-      actions: [...(currentSource.actions ?? []), code],
+      actions: [...(currentSource.actions ?? []), waitData.code],
     }]);
 
     // 대기 UI 닫기

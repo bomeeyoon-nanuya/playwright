@@ -173,6 +173,7 @@ export interface ExpectOption {
   syntax: string;
   category: string;
   params?: ExpectParam[];
+  waitType?: string; // 대기 타입 (waitForSelector, waitForTimeout 등)
 }
 
 export interface ExpectCategory {

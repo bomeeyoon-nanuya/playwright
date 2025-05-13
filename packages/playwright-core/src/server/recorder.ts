@@ -144,6 +144,11 @@ export class Recorder implements InstrumentationListener, IRecorder {
         this._contextRecorder.runTask(data.params.task);
         return;
       }
+
+      if (data.event === 'recordInspectorAction') {
+        this._recordInspectorAction(data.params);
+        return;
+      }
     });
 
     await Promise.all([
@@ -219,6 +224,32 @@ export class Recorder implements InstrumentationListener, IRecorder {
     this._debugger.on(Debugger.Events.PausedStateChanged, () => this._pausedStateChanged());
 
     (this._context as any).recorderAppForTest = this._recorderApp;
+  }
+
+  async _recordInspectorAction(data: any) {
+    try {
+      // 현재 페이지 가져오기
+      const pages = this._context.pages();
+      if (!pages.length)
+        return;
+
+      // 활성화된 페이지 찾기
+      const activePage = pages.find(p => !p.isClosed());
+      if (!activePage)
+        return;
+
+      // 액션 추출
+      const { action } = data;
+
+      if (!action)
+        return;
+
+      // 대기 액션을 서버 컬렉션에 기록
+      const frame = activePage.mainFrame();
+      await this._contextRecorder._recordAction(frame, action);
+    } catch (err) {
+      // 에러 처리
+    }
   }
 
   _pausedStateChanged() {
@@ -433,6 +464,65 @@ export class Recorder implements InstrumentationListener, IRecorder {
 
       this._recorderSources = updatedSources;
       this._pushAllSources();
+    }
+  }
+
+  private async _executeAction(data: any) {
+    try {
+      // 액션과 프레임 정보 추출
+      const { action, frame } = data;
+
+      if (!action)
+        return;
+
+      // 액션 처리를 위한 페이지와 프레임 찾기
+      const pages = this._context.pages();
+      if (!pages.length)
+        return;
+
+      // 페이지 별칭 또는 첫번째 페이지 사용
+      const pageAlias = frame?.pageAlias || 'page';
+      let targetPage = pages[0];
+
+      // 페이지 별칭으로 찾기 (필요한 경우)
+      if (pageAlias !== 'page' && pageAlias !== targetPage.name()) {
+        for (const page of pages) {
+          if (page.name() === pageAlias) {
+            targetPage = page;
+            break;
+          }
+        }
+      }
+
+      // 타겟 프레임 가져오기 (framePath가 없으면 메인 프레임)
+      let targetFrame = targetPage.mainFrame();
+      const framePath = frame?.framePath || [];
+
+      // 프레임 경로 탐색 (중첩된 프레임인 경우)
+      for (const frameSelector of framePath) {
+        const childFrame = targetFrame.childFrames().find(f => f.url().includes(frameSelector));
+        if (childFrame)
+          targetFrame = childFrame;
+        else
+          break;
+
+      }
+
+      // ContextRecorder에 액션 기록
+      await this._contextRecorder._recordAction(targetFrame, action);
+
+      // 액션 실행 (필요한 경우)
+      if (action.name === 'waitForSelector' && action.selector) {
+        await targetFrame.waitForSelector(action.selector, {
+          state: action.state,
+          timeout: action.timeout
+        });
+      } else if (action.name === 'waitForTimeout' && action.timeout) {
+        await targetFrame.waitForTimeout(action.timeout);
+      }
+
+    } catch (err) {
+      // 에러 처리
     }
   }
 }

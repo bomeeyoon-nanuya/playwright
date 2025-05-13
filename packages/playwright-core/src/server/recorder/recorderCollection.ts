@@ -79,6 +79,7 @@ export class RecorderCollection extends EventEmitter {
 
 
     this._actions.push(actionInContext);
+    console.log('actionInContext : ', this._actions);
     this._fireChange();
     await callback?.().catch();
     actionInContext.endTime = monotonicTime();

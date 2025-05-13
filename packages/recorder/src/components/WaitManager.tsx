@@ -21,6 +21,30 @@ import { WAIT_OPTIONS, WAIT_CATEGORIES } from '../constants/playwright-waits';
 import type { ExpectOption } from '../recorderTypes';
 import './WaitManager.css';
 
+// 액션 관련 타입 정의
+interface WaitAction {
+  name: string;
+  selector?: string;
+  timeout?: number;
+  state?: string;
+  signals: any[];
+}
+
+// 프레임 관련 타입 정의
+interface Frame {
+  pageAlias: string;
+  framePath: string[];
+}
+
+// waitData 타입 정의
+interface WaitData extends ExpectOption {
+  code: string;
+  selector: string;
+  waitType?: string;
+  action: WaitAction;
+  frame: Frame;
+}
+
 interface WaitManagerProps {
   isOpen: boolean;
   selector: string;
@@ -29,7 +53,7 @@ interface WaitManagerProps {
   currentValue?: string;
   elementType?: string;
   onClose: () => void;
-  onAddWait: (code: string) => void;
+  onAddWait: (data: WaitData) => void;
 }
 
 enum WaitStep {
@@ -72,20 +96,39 @@ export const WaitManager: React.FC<WaitManagerProps> = ({
 
   // 대기 파라미터 입력 후 제출 처리
   const handleSubmitParams = (params: Record<string, any>) => {
-    debugger;
     if (!selectedOption)
       return;
 
-    // 최종 대기 코드 생성
-    generateWaitCode(selectedOption, selector, params)
-        .then(code => {
-          console.log(selectedOption);
-          console.log(selector);
-          console.log(params);
+    // 대기 코드 생성 및 액션 실행
+    executeWaitAction(selectedOption, selector, params)
+        .then(({ code, action }) => {
+        // 프레임 정보 생성
+          const frame: Frame = {
+            pageAlias: 'page',
+            framePath: []
+          };
 
-          debugger;
-          // 생성된 코드를 상위 컴포넌트로 전달
-          onAddWait(code);
+          // 테스트 브라우저에 액션 직접 전송
+          window.dispatch({
+            event: 'recordInspectorAction',
+            params: {
+              action,
+              frame
+            }
+          }).catch(() => {
+            // 에러 처리
+          });
+
+          // 부모 컴포넌트에 대기 데이터 전달 (UI 업데이트용)
+          onAddWait({
+            ...selectedOption,
+            code,
+            selector,
+            action,
+            frame
+          });
+
+          // 모달 닫기
           onClose();
         });
   };
@@ -102,12 +145,12 @@ export const WaitManager: React.FC<WaitManagerProps> = ({
     }
   };
 
-  // 대기 코드 생성 함수
-  const generateWaitCode = async (
+  // 대기 코드 생성 및 액션 객체 생성 함수
+  const executeWaitAction = async (
     option: ExpectOption,
     selector: string,
     params: Record<string, any>
-  ): Promise<string> => {
+  ): Promise<{ code: string, action: WaitAction }> => {
     let code = option.syntax;
 
     // 파라미터 값을 코드에 삽입
@@ -163,10 +206,19 @@ export const WaitManager: React.FC<WaitManagerProps> = ({
       else
         selectorValue = `'${selector}'`;
 
-      code = code.replace('selector', selectorValue);
+      code = code.replace(/selector/g, selectorValue);
     }
 
-    return code;
+    // 테스트 브라우저용 액션 객체 생성
+    const action: WaitAction = {
+      name: option.id,           // waitType 대신 id 사용
+      selector: selector,        // 선택자 정보
+      timeout: params.timeout,   // 타임아웃 값
+      state: params.state,       // 상태 (visible, hidden 등)
+      signals: []                // 신호 배열
+    };
+
+    return { code, action };
   };
 
   if (!isOpen)
