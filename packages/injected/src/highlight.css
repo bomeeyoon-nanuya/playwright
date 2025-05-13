@@ -315,3 +315,15 @@ x-locator-editor.does-not-match {
   width: 100% !important;
   height: 100% !important;
 }
+
+/* 대기 아이콘 */
+x-pw-tool-item.wait-for > x-div {
+  /* 시계 아이콘 - codicon: history */
+  clip-path: url(#icon-history);
+}
+
+/* 고급 검증 아이콘 */
+x-pw-tool-item.enhanced-assert > x-div {
+  /* 고급 검증 아이콘 - codicon: checklist */
+  clip-path: url(#icon-list-filter);
+}

@@ -807,6 +807,8 @@ class Overlay {
   private _assertTextToggle: HTMLElement;
   private _assertValuesToggle: HTMLElement;
   private _assertSnapshotToggle: HTMLElement;
+  private _waitForToggle: HTMLElement;
+  private _enhancedAssertToggle: HTMLElement;
   private _offsetX = 0;
   private _dragState: { offsetX: number, dragStart: { x: number, y: number } } | undefined;
   private _measure: { width: number, height: number } = { width: 0, height: 0 };
@@ -823,40 +825,52 @@ class Overlay {
     toolsListElement.appendChild(this._dragHandle);
 
     this._recordToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._recordToggle.title = 'Record';
+    this._recordToggle.title = '녹화';
     this._recordToggle.classList.add('record');
     this._recordToggle.appendChild(this._recorder.document.createElement('x-div'));
     toolsListElement.appendChild(this._recordToggle);
 
     this._pickLocatorToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._pickLocatorToggle.title = 'Pick locator';
+    this._pickLocatorToggle.title = '요소 선택';
     this._pickLocatorToggle.classList.add('pick-locator');
     this._pickLocatorToggle.appendChild(this._recorder.document.createElement('x-div'));
     toolsListElement.appendChild(this._pickLocatorToggle);
 
     this._assertVisibilityToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._assertVisibilityToggle.title = 'Assert visibility';
+    this._assertVisibilityToggle.title = '화면에 표시 확인';
     this._assertVisibilityToggle.classList.add('visibility');
     this._assertVisibilityToggle.appendChild(this._recorder.document.createElement('x-div'));
     toolsListElement.appendChild(this._assertVisibilityToggle);
 
     this._assertTextToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._assertTextToggle.title = 'Assert text';
+    this._assertTextToggle.title = '텍스트 검증';
     this._assertTextToggle.classList.add('text');
     this._assertTextToggle.appendChild(this._recorder.document.createElement('x-div'));
     toolsListElement.appendChild(this._assertTextToggle);
 
     this._assertValuesToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._assertValuesToggle.title = 'Assert value';
+    this._assertValuesToggle.title = '값 검증';
     this._assertValuesToggle.classList.add('value');
     this._assertValuesToggle.appendChild(this._recorder.document.createElement('x-div'));
     toolsListElement.appendChild(this._assertValuesToggle);
 
     this._assertSnapshotToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._assertSnapshotToggle.title = 'Assert snapshot';
+    this._assertSnapshotToggle.title = '스냅샷 검증';
     this._assertSnapshotToggle.classList.add('snapshot');
     this._assertSnapshotToggle.appendChild(this._recorder.document.createElement('x-div'));
     toolsListElement.appendChild(this._assertSnapshotToggle);
+
+    this._waitForToggle = this._recorder.document.createElement('x-pw-tool-item');
+    this._waitForToggle.title = '대기';
+    this._waitForToggle.classList.add('wait-for');
+    this._waitForToggle.appendChild(this._recorder.document.createElement('x-div'));
+    toolsListElement.appendChild(this._waitForToggle);
+
+    this._enhancedAssertToggle = this._recorder.document.createElement('x-pw-tool-item');
+    this._enhancedAssertToggle.title = '고급 검증';
+    this._enhancedAssertToggle.classList.add('enhanced-assert');
+    this._enhancedAssertToggle.appendChild(this._recorder.document.createElement('x-div'));
+    toolsListElement.appendChild(this._enhancedAssertToggle);
 
     this._updateVisualPosition();
     this._refreshListeners();
@@ -886,6 +900,8 @@ class Overlay {
           'assertingVisibility': 'recording-inspecting',
           'assertingValue': 'recording-inspecting',
           'assertingSnapshot': 'recording-inspecting',
+          'waitingFor': 'recording-inspecting',
+          'enhancedAsserting': 'recording-inspecting',
         };
         this._recorder.setMode(newMode[this._recorder.state.mode]);
       }),
@@ -904,6 +920,14 @@ class Overlay {
       addEventListener(this._assertSnapshotToggle, 'click', () => {
         if (!this._assertSnapshotToggle.classList.contains('disabled'))
           this._recorder.setMode(this._recorder.state.mode === 'assertingSnapshot' ? 'recording' : 'assertingSnapshot');
+      }),
+      addEventListener(this._waitForToggle, 'click', () => {
+        if (!this._waitForToggle.classList.contains('disabled'))
+          this._recorder.setMode(this._recorder.state.mode === 'waitingFor' ? 'recording' : 'waitingFor');
+      }),
+      addEventListener(this._enhancedAssertToggle, 'click', () => {
+        if (!this._enhancedAssertToggle.classList.contains('disabled'))
+          this._recorder.setMode(this._recorder.state.mode === 'enhancedAsserting' ? 'recording' : 'enhancedAsserting');
       }),
     ];
   }
@@ -929,6 +953,11 @@ class Overlay {
     this._assertValuesToggle.classList.toggle('disabled', state.mode === 'none' || state.mode === 'standby' || state.mode === 'inspecting');
     this._assertSnapshotToggle.classList.toggle('toggled', state.mode === 'assertingSnapshot');
     this._assertSnapshotToggle.classList.toggle('disabled', state.mode === 'none' || state.mode === 'standby' || state.mode === 'inspecting');
+    // 새 버튼 상태 설정
+    this._waitForToggle.classList.toggle('toggled', state.mode === 'waitingFor');
+    this._waitForToggle.classList.toggle('disabled', state.mode === 'none' || state.mode === 'standby' || state.mode === 'inspecting');
+    this._enhancedAssertToggle.classList.toggle('toggled', state.mode === 'enhancedAsserting');
+    this._enhancedAssertToggle.classList.toggle('disabled', state.mode === 'none' || state.mode === 'standby' || state.mode === 'inspecting');
     if (this._offsetX !== state.overlay.offsetX) {
       this._offsetX = state.overlay.offsetX;
       this._updateVisualPosition();
@@ -1039,6 +1068,8 @@ export class Recorder {
       'assertingVisibility': new InspectTool(this, true),
       'assertingValue': new TextAssertionTool(this, 'value'),
       'assertingSnapshot': new TextAssertionTool(this, 'snapshot'),
+      'waitingFor': new NoneTool(),
+      'enhancedAsserting': new NoneTool(),
     };
     this._currentTool = this._tools.none;
     if (injectedScript.window.top === injectedScript.window) {
