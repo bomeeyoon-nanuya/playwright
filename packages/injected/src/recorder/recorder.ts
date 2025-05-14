@@ -15,6 +15,7 @@
  */
 
 import clipPaths from './clipPaths';
+import { WAIT_STATE, WaitState, createWaitOptionsContent } from './waitForOptionsContent';
 
 import type { Point } from '@isomorphic/types';
 import type { Highlight, HighlightEntry } from '../highlight';
@@ -59,6 +60,7 @@ interface RecorderTool {
   onMouseLeave?(event: MouseEvent): void;
   onFocus?(event: Event): void;
   onScroll?(event: Event): void;
+  initializeToolUI?(): void;
 }
 
 class NoneTool implements RecorderTool {
@@ -796,6 +798,118 @@ class TextAssertionTool implements RecorderTool {
   }
 }
 
+class WaitForTool implements RecorderTool {
+  private _recorder: Recorder;
+  private _hoverHighlight: { selector: string, elements: Element[], color: string } | null = null;
+  private _dialog: Dialog;
+  private _currentWaitState: WaitState = WAIT_STATE.ELEMENT;
+  private _currentTimeout: number = 5000;
+
+  static _isAnyDialogShowing = false;
+
+  constructor(recorder: Recorder) {
+    this._recorder = recorder;
+    this._dialog = new Dialog(recorder);
+  }
+
+  cursor() {
+    return 'pointer';
+  }
+
+  cleanup() {
+    this._dialog.close();
+    this._hoverHighlight = null;
+    // 정리할 때 전역 플래그 초기화
+    WaitForTool._isAnyDialogShowing = false;
+  }
+
+  // 도구가 선택될 때 UI 초기화
+  initializeToolUI() {
+    // 즉시 모달 표시 (지연 없이)
+    const window = this._recorder.injectedScript.window;
+    if (window.top === window) {
+      // 즉시 실행하지만 브라우저 렌더링 사이클 이후에 실행
+      setTimeout(() => {
+        if (!WaitForTool._isAnyDialogShowing && !this._dialog.isShowing())
+          this._showDialog();
+      }, 0);
+    }
+  }
+
+  onClick(event: MouseEvent) {
+    consumeEvent(event);
+    // 클릭 발생 시 즉시 모달 표시 (최상위 프레임에서만)
+    const window = this._recorder.injectedScript.window;
+    if (window.top === window && !this._dialog.isShowing() && !WaitForTool._isAnyDialogShowing)
+      this._showDialog();
+
+  }
+
+  // 외부에서 대화상자를 표시할 수 있는 공개 메서드
+  showDialog() {
+    // 최상위 프레임에서만 대화상자 표시 (iframe 내에서는 표시하지 않음)
+    const window = this._recorder.injectedScript.window;
+    if (window.top === window && !this._dialog.isShowing() && !WaitForTool._isAnyDialogShowing)
+      this._showDialog();
+  }
+
+  onMouseMove(event: MouseEvent) {
+    consumeEvent(event);
+  }
+
+  private _showDialog() {
+    // 모달을 표시할 때 전역 플래그 설정
+    WaitForTool._isAnyDialogShowing = true;
+
+    // 대기 옵션 UI 직접 생성
+    const div = this._recorder.document.createElement('div');
+    div.classList.add('wait-for-dialog');
+
+    div.style.padding = '24px';
+    div.style.minWidth = '340px';
+    div.style.maxWidth = '640px';
+    div.style.backgroundColor = '#ffffff';
+    div.style.borderRadius = '8px';
+    div.style.boxShadow = '0 12px 24px rgba(0, 0, 0, 0.3)';
+
+    div.innerHTML = `
+      <div class="wait-for-dialog-content" style="text-align: center;">
+      </div>
+    `;
+
+    // 대기 옵션 컨텐츠 추가
+    const content = this._createWaitOptionsContent();
+    div.querySelector('.wait-for-dialog-content')!.appendChild(content);
+
+    this._dialog.show({
+      label: '대기 옵션 설정',
+      body: div,
+      onCommit: () => {
+        WaitForTool._isAnyDialogShowing = false;
+        this._recorder.setMode('recording');
+      },
+      onCancel: () => {
+        WaitForTool._isAnyDialogShowing = false;
+        this._recorder.setMode('recording');
+      }
+    });
+  }
+
+  private _createWaitOptionsContent(): HTMLElement {
+    return createWaitOptionsContent({
+      document: this._recorder.document,
+      currentWaitState: this._currentWaitState,
+      currentTimeout: this._currentTimeout,
+      onWaitStateChange: state => {
+        this._currentWaitState = state;
+      },
+      onTimeoutChange: timeout => {
+        this._currentTimeout = timeout;
+      }
+    });
+  }
+}
+
 class Overlay {
   private _recorder: Recorder;
   private _listeners: (() => void)[] = [];
@@ -890,7 +1004,8 @@ class Overlay {
       addEventListener(this._pickLocatorToggle, 'click', () => {
         if (this._pickLocatorToggle.classList.contains('disabled'))
           return;
-        const newMode: Record<Mode, Mode> = {
+        // 타입 오류를 피하기 위해 타입 어서션 사용
+        const newMode = {
           'inspecting': 'standby',
           'none': 'inspecting',
           'standby': 'inspecting',
@@ -902,7 +1017,7 @@ class Overlay {
           'assertingSnapshot': 'recording-inspecting',
           'waitingFor': 'recording-inspecting',
           'enhancedAsserting': 'recording-inspecting',
-        };
+        } as const;
         this._recorder.setMode(newMode[this._recorder.state.mode]);
       }),
       addEventListener(this._assertVisibilityToggle, 'click', () => {
@@ -1058,6 +1173,7 @@ export class Recorder {
     this.document = injectedScript.document;
     this.injectedScript = injectedScript;
     this.highlight = injectedScript.createHighlight();
+
     this._tools = {
       'none': new NoneTool(),
       'standby': new NoneTool(),
@@ -1068,14 +1184,16 @@ export class Recorder {
       'assertingVisibility': new InspectTool(this, true),
       'assertingValue': new TextAssertionTool(this, 'value'),
       'assertingSnapshot': new TextAssertionTool(this, 'snapshot'),
-      'waitingFor': new NoneTool(),
+      'waitingFor': new WaitForTool(this),
       'enhancedAsserting': new NoneTool(),
     };
     this._currentTool = this._tools.none;
+
     if (injectedScript.window.top === injectedScript.window) {
       this.overlay = new Overlay(this);
       this.overlay.setUIState(this.state);
     }
+
     this._stylesheet = new injectedScript.window.CSSStyleSheet();
     this._stylesheet.replaceSync(`
       body[data-pw-cursor=pointer] *, body[data-pw-cursor=pointer] *::after { cursor: pointer !important; }
@@ -1132,6 +1250,11 @@ export class Recorder {
     this._currentTool.cleanup?.();
     this.clearHighlight();
     this._currentTool = newTool;
+
+    // 도구가 선택될 때 UI 초기화 메서드 호출
+    if (this._currentTool.initializeToolUI)
+      this._currentTool.initializeToolUI();
+
     this.injectedScript.document.body?.setAttribute('data-pw-cursor', newTool.cursor());
   }
 
@@ -1379,6 +1502,8 @@ class Dialog {
   private _recorder: Recorder;
   private _dialogElement: HTMLElement | null = null;
   private _keyboardListener: ((event: KeyboardEvent) => void) | undefined;
+  private _dragState: { startX: number, startY: number, origX: number, origY: number } | null = null;
+  private _dragListeners: (() => void)[] = [];
 
   constructor(recorder: Recorder) {
     this._recorder = recorder;
@@ -1410,6 +1535,12 @@ class Dialog {
     });
 
     this._dialogElement = this._recorder.document.createElement('x-pw-dialog');
+
+    // 드래그 가능하도록 스타일 설정
+    this._dialogElement.style.position = 'fixed';
+    this._dialogElement.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.3)';
+    this._dialogElement.style.zIndex = '10000';
+
     this._keyboardListener = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         this.close();
@@ -1425,6 +1556,18 @@ class Dialog {
 
     this._recorder.document.addEventListener('keydown', this._keyboardListener, true);
     const toolbarElement = this._recorder.document.createElement('x-pw-tools-list');
+
+    // 그리퍼 요소 추가
+    const gripperElement = this._recorder.document.createElement('x-pw-tool-gripper');
+    gripperElement.title = '드래그하여 이동';
+    gripperElement.style.cursor = 'move';
+    gripperElement.style.margin = '0 8px 0 0';
+    gripperElement.appendChild(this._recorder.document.createElement('x-div'));
+    gripperElement.addEventListener('mousedown', this._onDragStart.bind(this));
+
+    // 툴바에 그리퍼 먼저 추가
+    toolbarElement.appendChild(gripperElement);
+
     const labelElement = this._recorder.document.createElement('label');
     labelElement.textContent = options.label;
     toolbarElement.appendChild(labelElement);
@@ -1432,11 +1575,21 @@ class Dialog {
     toolbarElement.appendChild(acceptButton);
     toolbarElement.appendChild(cancelButton);
 
+    // 툴바 자체는 드래그 핸들러 제거하고 일반 커서로
+    toolbarElement.style.cursor = 'default';
+
     this._dialogElement.appendChild(toolbarElement);
     const bodyElement = this._recorder.document.createElement('x-pw-dialog-body');
     bodyElement.appendChild(options.body);
     this._dialogElement.appendChild(bodyElement);
     this._recorder.highlight.appendChild(this._dialogElement);
+
+    // 윈도우 중앙에 배치
+    this._centerDialog();
+
+    // 드래그 이벤트 리스너 설정
+    this._setupDragListeners();
+
     return this._dialogElement;
   }
 
@@ -1453,6 +1606,90 @@ class Dialog {
     this._dialogElement.remove();
     this._recorder.document.removeEventListener('keydown', this._keyboardListener!);
     this._dialogElement = null;
+
+    // 드래그 이벤트 리스너 제거
+    this._removeDragListeners();
+  }
+
+  private _centerDialog() {
+    if (!this._dialogElement)
+      return;
+
+    // 브라우저 창의 크기 가져오기
+    const window = this._recorder.injectedScript.window;
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+
+    // 다이얼로그 크기 가져오기
+    const rect = this._dialogElement.getBoundingClientRect();
+    const dialogWidth = rect.width;
+    const dialogHeight = rect.height;
+
+    // 중앙 위치 계산
+    const left = Math.max(0, (windowWidth - dialogWidth) / 2);
+    const top = Math.max(0, (windowHeight - dialogHeight) / 3); // 약간 위쪽에 배치
+
+    // 위치 설정
+    this._dialogElement.style.left = left + 'px';
+    this._dialogElement.style.top = top + 'px';
+  }
+
+  private _onDragStart(event: MouseEvent) {
+    if (!this._dialogElement || event.button !== 0)
+      return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const rect = this._dialogElement.getBoundingClientRect();
+
+    this._dragState = {
+      startX: event.clientX,
+      startY: event.clientY,
+      origX: rect.left,
+      origY: rect.top
+    };
+  }
+
+  private _onDragMove(event: MouseEvent) {
+    if (!this._dragState || !this._dialogElement)
+      return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const dx = event.clientX - this._dragState.startX;
+    const dy = event.clientY - this._dragState.startY;
+
+    const newLeft = this._dragState.origX + dx;
+    const newTop = this._dragState.origY + dy;
+
+    this._dialogElement.style.left = newLeft + 'px';
+    this._dialogElement.style.top = newTop + 'px';
+  }
+
+  private _onDragEnd() {
+    this._dragState = null;
+  }
+
+  private _setupDragListeners() {
+    // 기존 리스너 제거
+    this._removeDragListeners();
+
+    // 새 리스너 추가
+    const onDragMove = this._onDragMove.bind(this);
+    const onDragEnd = this._onDragEnd.bind(this);
+
+    this._dragListeners = [
+      addEventListener(this._recorder.document, 'mousemove', onDragMove as EventListener, true),
+      addEventListener(this._recorder.document, 'mouseup', onDragEnd as EventListener, true)
+    ];
+  }
+
+  private _removeDragListeners() {
+    for (const remove of this._dragListeners)
+      remove();
+    this._dragListeners = [];
   }
 }
 
