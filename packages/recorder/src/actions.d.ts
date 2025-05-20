@@ -31,7 +31,12 @@ export type ActionName =
   'assertValue' |
   'assertChecked' |
   'assertVisible' |
-  'assertSnapshot';
+  'assertSnapshot' |
+  'waitForSelector' |
+  'waitForNavigation' |
+  'waitForTimeout' |
+  'waitForLoadState' |
+  'waitForResponse';
 
 export type ActionBase = {
   name: ActionName,
@@ -119,7 +124,46 @@ export type AssertSnapshotAction = ActionWithSelector & {
   snapshot: string,
 };
 
-export type Action = ClickAction | CheckAction | ClosesPageAction | OpenPageAction | UncheckAction | FillAction | NavigateAction | PressAction | SelectAction | SetInputFilesAction | AssertTextAction | AssertValueAction | AssertCheckedAction | AssertVisibleAction | AssertSnapshotAction;
+export type WaitForSelectorAction = ActionWithSelector & {
+  name: 'waitForSelector',
+  options?: {
+    state?: 'attached' | 'detached' | 'visible' | 'hidden',
+    timeout?: number
+  }
+};
+
+export type WaitForNavigationAction = ActionBase & {
+  name: 'waitForNavigation',
+  options?: {
+    timeout?: number,
+    waitUntil?: 'load' | 'domcontentloaded' | 'networkidle'
+  }
+};
+
+export type WaitForTimeoutAction = ActionBase & {
+  name: 'waitForTimeout',
+  options?: {
+    timeout: number
+  }
+};
+
+export type WaitForLoadStateAction = ActionBase & {
+  name: 'waitForLoadState',
+  state: 'load' | 'domcontentloaded' | 'networkidle',
+  options?: {
+    timeout?: number
+  }
+};
+
+export type WaitForResponseAction = ActionBase & {
+  name: 'waitForResponse',
+  url: string,
+  options?: {
+    timeout?: number
+  }
+};
+
+export type Action = ClickAction | CheckAction | ClosesPageAction | OpenPageAction | UncheckAction | FillAction | NavigateAction | PressAction | SelectAction | SetInputFilesAction | AssertTextAction | AssertValueAction | AssertCheckedAction | AssertVisibleAction | AssertSnapshotAction | WaitForSelectorAction | WaitForNavigationAction | WaitForTimeoutAction | WaitForLoadStateAction | WaitForResponseAction;
 export type AssertAction = AssertCheckedAction | AssertValueAction | AssertTextAction | AssertVisibleAction | AssertSnapshotAction;
 export type PerformOnRecordAction = ClickAction | CheckAction | UncheckAction | PressAction | SelectAction;
 

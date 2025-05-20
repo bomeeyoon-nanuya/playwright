@@ -149,7 +149,22 @@ export class CSharpLanguageGenerator implements LanguageGenerator {
       }
       case 'assertSnapshot':
         return `await Expect(${subject}.${this._asLocator(action.selector)}).ToMatchAriaSnapshotAsync(${quote(action.snapshot)});`;
+      case 'waitForSelector': {
+        const options = action.options || {};
+        const formattedOptions = Object.keys(options).length ?
+          `, new LocatorWaitForOptions { ${Object.entries(options).map(([key, value]) => `${toPascal(key)} = ${typeof value === 'string' ? quote(value) : value}`).join(', ')} }` :
+          '';
+        return `await ${subject}.WaitForSelectorAsync(${this._asLocator(action.selector)}${formattedOptions});`;
+      }
+      case 'waitForTimeout': {
+        const timeout = action.options?.timeout ?? 0;
+        if (typeof timeout === 'number')
+          return `await ${subject}.WaitForTimeoutAsync(${timeout});`;
+        return `await ${subject}.WaitForTimeoutAsync(${quote(timeout)});`;
+      }
     }
+
+    return `// 알 수 없는 액션: ${action.name}`;
   }
 
   private _asLocator(selector: string) {
@@ -303,6 +318,8 @@ class CSharpFormatter {
   }
 
   add(text: string) {
+    if (!text)
+      return;
     this._lines.push(...text.trim().split('\n').map(line => line.trim()));
   }
 

@@ -149,6 +149,8 @@ export const Recorder: React.FC<RecorderProps> = ({
           'assertingVisibility': 'recording-inspecting',
           'assertingValue': 'recording-inspecting',
           'assertingSnapshot': 'recording-inspecting',
+          'waitingFor': 'recording-inspecting',
+          'enhancedAsserting': 'recording-inspecting',
         }[mode];
         window.dispatch({ event: 'setMode', params: { mode: newMode } }).catch(() => { });
       }}></ToolbarButton>

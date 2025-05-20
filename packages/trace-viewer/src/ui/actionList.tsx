@@ -306,6 +306,32 @@ const actionParameterDisplayString = (
     };
   }
 
+  // Handle waitFor actions
+  if (action.method?.startsWith('waitFor')) {
+    switch (action.method) {
+      case 'waitForSelector':
+        if (params.selector)
+          return { type: 'locator', value: asLocator(sdkLanguage, params.selector) };
+        break;
+      case 'waitForNavigation':
+        if (params.options?.waitUntil)
+          return { type: 'generic', value: `"${params.options.waitUntil}"` };
+        break;
+      case 'waitForTimeout':
+        if (params.options?.timeout)
+          return { type: 'generic', value: `${params.options.timeout}ms` };
+        break;
+      case 'waitForLoadState':
+        if (params.state)
+          return { type: 'generic', value: `"${params.state}"` };
+        break;
+      case 'waitForResponse':
+        if (params.url)
+          return { type: 'generic', value: `"${params.url}"` };
+        break;
+    }
+  }
+
   switch (action.class.toLowerCase()) {
     case 'browsercontext':
       return clockDisplayString(action);

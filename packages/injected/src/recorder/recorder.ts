@@ -15,7 +15,7 @@
  */
 
 import clipPaths from './clipPaths';
-import { WAIT_STATE, WaitState, createWaitOptionsContent } from './waitForOptionsContent';
+import { WaitState, createWaitOptionsContent } from './waitForOptionsContent';
 
 import type { Point } from '@isomorphic/types';
 import type { Highlight, HighlightEntry } from '../highlight';
@@ -802,14 +802,18 @@ class WaitForTool implements RecorderTool {
   private _recorder: Recorder;
   private _hoverHighlight: { selector: string, elements: Element[], color: string } | null = null;
   private _dialog: Dialog;
-  private _currentWaitState: WaitState = WAIT_STATE.ELEMENT;
+  private _currentWaitState: WaitState | null = null;
   private _currentTimeout: number = 5000;
 
   static _isAnyDialogShowing = false;
 
   constructor(recorder: Recorder) {
     this._recorder = recorder;
-    this._dialog = new Dialog(recorder);
+    this._dialog = new Dialog(recorder, {
+      styles: {
+        width: '920px',
+      }
+    });
   }
 
   cursor() {
@@ -819,16 +823,11 @@ class WaitForTool implements RecorderTool {
   cleanup() {
     this._dialog.close();
     this._hoverHighlight = null;
-    // 정리할 때 전역 플래그 초기화
-    WaitForTool._isAnyDialogShowing = false;
   }
 
-  // 도구가 선택될 때 UI 초기화
   initializeToolUI() {
-    // 즉시 모달 표시 (지연 없이)
     const window = this._recorder.injectedScript.window;
     if (window.top === window) {
-      // 즉시 실행하지만 브라우저 렌더링 사이클 이후에 실행
       setTimeout(() => {
         if (!WaitForTool._isAnyDialogShowing && !this._dialog.isShowing())
           this._showDialog();
@@ -838,16 +837,12 @@ class WaitForTool implements RecorderTool {
 
   onClick(event: MouseEvent) {
     consumeEvent(event);
-    // 클릭 발생 시 즉시 모달 표시 (최상위 프레임에서만)
     const window = this._recorder.injectedScript.window;
     if (window.top === window && !this._dialog.isShowing() && !WaitForTool._isAnyDialogShowing)
       this._showDialog();
-
   }
 
-  // 외부에서 대화상자를 표시할 수 있는 공개 메서드
   showDialog() {
-    // 최상위 프레임에서만 대화상자 표시 (iframe 내에서는 표시하지 않음)
     const window = this._recorder.injectedScript.window;
     if (window.top === window && !this._dialog.isShowing() && !WaitForTool._isAnyDialogShowing)
       this._showDialog();
@@ -858,16 +853,14 @@ class WaitForTool implements RecorderTool {
   }
 
   private _showDialog() {
-    // 모달을 표시할 때 전역 플래그 설정
-    WaitForTool._isAnyDialogShowing = true;
+    // 항상 플래그 리셋하여 모달이 항상 표시되도록 보장
+    WaitForTool._isAnyDialogShowing = false;
 
-    // 대기 옵션 UI 직접 생성
     const div = this._recorder.document.createElement('div');
     div.classList.add('wait-for-dialog');
 
     div.style.padding = '24px';
     div.style.minWidth = '340px';
-    div.style.maxWidth = '640px';
     div.style.backgroundColor = '#ffffff';
     div.style.borderRadius = '8px';
     div.style.boxShadow = '0 12px 24px rgba(0, 0, 0, 0.3)';
@@ -877,7 +870,6 @@ class WaitForTool implements RecorderTool {
       </div>
     `;
 
-    // 대기 옵션 컨텐츠 추가
     const content = this._createWaitOptionsContent();
     div.querySelector('.wait-for-dialog-content')!.appendChild(content);
 
@@ -897,8 +889,9 @@ class WaitForTool implements RecorderTool {
 
   private _createWaitOptionsContent(): HTMLElement {
     return createWaitOptionsContent({
+      recorder: this._recorder,
       document: this._recorder.document,
-      currentWaitState: this._currentWaitState,
+      currentWaitState: this._currentWaitState as WaitState,
       currentTimeout: this._currentTimeout,
       onWaitStateChange: state => {
         this._currentWaitState = state;
@@ -1004,7 +997,6 @@ class Overlay {
       addEventListener(this._pickLocatorToggle, 'click', () => {
         if (this._pickLocatorToggle.classList.contains('disabled'))
           return;
-        // 타입 오류를 피하기 위해 타입 어서션 사용
         const newMode = {
           'inspecting': 'standby',
           'none': 'inspecting',
@@ -1068,7 +1060,6 @@ class Overlay {
     this._assertValuesToggle.classList.toggle('disabled', state.mode === 'none' || state.mode === 'standby' || state.mode === 'inspecting');
     this._assertSnapshotToggle.classList.toggle('toggled', state.mode === 'assertingSnapshot');
     this._assertSnapshotToggle.classList.toggle('disabled', state.mode === 'none' || state.mode === 'standby' || state.mode === 'inspecting');
-    // 새 버튼 상태 설정
     this._waitForToggle.classList.toggle('toggled', state.mode === 'waitingFor');
     this._waitForToggle.classList.toggle('disabled', state.mode === 'none' || state.mode === 'standby' || state.mode === 'inspecting');
     this._enhancedAssertToggle.classList.toggle('toggled', state.mode === 'enhancedAsserting');
@@ -1083,12 +1074,14 @@ class Overlay {
       this._showOverlay();
   }
 
-  flashToolSucceeded(tool: 'assertingVisibility' | 'assertingSnapshot' | 'assertingValue') {
+  flashToolSucceeded(tool: 'assertingVisibility' | 'assertingSnapshot' | 'assertingValue' | 'waitingFor') {
     let element: Element;
     if (tool === 'assertingVisibility')
       element = this._assertVisibilityToggle;
     else if (tool === 'assertingSnapshot')
       element = this._assertSnapshotToggle;
+    else if (tool === 'waitingFor')
+      element = this._waitForToggle;
     else
       element = this._assertValuesToggle;
     element.classList.add('succeeded');
@@ -1229,7 +1222,6 @@ export class Recorder {
     ];
 
     this.highlight.install();
-    // some frameworks erase the DOM on hydration, this ensures it's reattached
     let recreationInterval: number | undefined;
     const recreate = () => {
       this.highlight.install();
@@ -1251,7 +1243,6 @@ export class Recorder {
     this.clearHighlight();
     this._currentTool = newTool;
 
-    // 도구가 선택될 때 UI 초기화 메서드 호출
     if (this._currentTool.initializeToolUI)
       this._currentTool.initializeToolUI();
 
@@ -1504,13 +1495,24 @@ class Dialog {
   private _keyboardListener: ((event: KeyboardEvent) => void) | undefined;
   private _dragState: { startX: number, startY: number, origX: number, origY: number } | null = null;
   private _dragListeners: (() => void)[] = [];
+  private _styles: Record<string, string> | undefined;
 
-  constructor(recorder: Recorder) {
+  constructor(recorder: Recorder, options?: { styles?: Record<string, string> }) {
     this._recorder = recorder;
+    this._styles = options?.styles;
   }
 
   isShowing(): boolean {
     return !!this._dialogElement;
+  }
+
+  moveTo(top: number, left: number): void {
+    if (!this._dialogElement)
+      return;
+
+    this._dialogElement.style.position = 'fixed';
+    this._dialogElement.style.top = `${top}px`;
+    this._dialogElement.style.left = `${left}px`;
   }
 
   show(options: {
@@ -1518,6 +1520,7 @@ class Dialog {
     body: Element;
     onCommit: () => void;
     onCancel?: () => void;
+    width?: string;
   }) {
     const acceptButton = this._recorder.document.createElement('x-pw-tool-item');
     acceptButton.title = 'Accept';
@@ -1536,10 +1539,22 @@ class Dialog {
 
     this._dialogElement = this._recorder.document.createElement('x-pw-dialog');
 
-    // 드래그 가능하도록 스타일 설정
     this._dialogElement.style.position = 'fixed';
     this._dialogElement.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.3)';
     this._dialogElement.style.zIndex = '10000';
+
+    if (options.width)
+      this._dialogElement.style.width = options.width;
+    else if (this._styles?.width)
+      this._dialogElement.style.width = this._styles.width;
+
+    if (this._styles) {
+      for (const [property, value] of Object.entries(this._styles)) {
+        if (property !== 'width')
+          this._dialogElement.style[property as any] = value;
+
+      }
+    }
 
     this._keyboardListener = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -1557,7 +1572,6 @@ class Dialog {
     this._recorder.document.addEventListener('keydown', this._keyboardListener, true);
     const toolbarElement = this._recorder.document.createElement('x-pw-tools-list');
 
-    // 그리퍼 요소 추가
     const gripperElement = this._recorder.document.createElement('x-pw-tool-gripper');
     gripperElement.title = '드래그하여 이동';
     gripperElement.style.cursor = 'move';
@@ -1565,7 +1579,6 @@ class Dialog {
     gripperElement.appendChild(this._recorder.document.createElement('x-div'));
     gripperElement.addEventListener('mousedown', this._onDragStart.bind(this));
 
-    // 툴바에 그리퍼 먼저 추가
     toolbarElement.appendChild(gripperElement);
 
     const labelElement = this._recorder.document.createElement('label');
@@ -1575,7 +1588,6 @@ class Dialog {
     toolbarElement.appendChild(acceptButton);
     toolbarElement.appendChild(cancelButton);
 
-    // 툴바 자체는 드래그 핸들러 제거하고 일반 커서로
     toolbarElement.style.cursor = 'default';
 
     this._dialogElement.appendChild(toolbarElement);
@@ -1584,20 +1596,11 @@ class Dialog {
     this._dialogElement.appendChild(bodyElement);
     this._recorder.highlight.appendChild(this._dialogElement);
 
-    // 윈도우 중앙에 배치
     this._centerDialog();
 
-    // 드래그 이벤트 리스너 설정
     this._setupDragListeners();
 
     return this._dialogElement;
-  }
-
-  moveTo(top: number, left: number) {
-    if (!this._dialogElement)
-      return;
-    this._dialogElement.style.top = top + 'px';
-    this._dialogElement.style.left = left + 'px';
   }
 
   close() {
@@ -1607,7 +1610,6 @@ class Dialog {
     this._recorder.document.removeEventListener('keydown', this._keyboardListener!);
     this._dialogElement = null;
 
-    // 드래그 이벤트 리스너 제거
     this._removeDragListeners();
   }
 
@@ -1615,23 +1617,15 @@ class Dialog {
     if (!this._dialogElement)
       return;
 
-    // 브라우저 창의 크기 가져오기
     const window = this._recorder.injectedScript.window;
     const windowWidth = window.innerWidth;
-    const windowHeight = window.innerHeight;
 
-    // 다이얼로그 크기 가져오기
     const rect = this._dialogElement.getBoundingClientRect();
     const dialogWidth = rect.width;
-    const dialogHeight = rect.height;
 
-    // 중앙 위치 계산
     const left = Math.max(0, (windowWidth - dialogWidth) / 2);
-    const top = Math.max(0, (windowHeight - dialogHeight) / 3); // 약간 위쪽에 배치
 
-    // 위치 설정
     this._dialogElement.style.left = left + 'px';
-    this._dialogElement.style.top = top + 'px';
   }
 
   private _onDragStart(event: MouseEvent) {
@@ -1673,10 +1667,8 @@ class Dialog {
   }
 
   private _setupDragListeners() {
-    // 기존 리스너 제거
     this._removeDragListeners();
 
-    // 새 리스너 추가
     const onDragMove = this._onDragMove.bind(this);
     const onDragEnd = this._onDragEnd.bind(this);
 
@@ -1784,7 +1776,6 @@ function entriesForSelectorHighlight(injectedScript: InjectedScript, language: L
 }
 
 export type SvgJson = {
-  // for instance, <g> elements are not supported in clipPaths
   tagName: 'svg' | 'defs' | 'clipPath' | 'path';
   attrs?: Record<string, string>;
   children?: SvgJson[];
