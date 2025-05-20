@@ -1298,7 +1298,7 @@ BrowserContext:
         outputFile: string?
         handleSIGINT: boolean?
         omitCallTracking: boolean?
-
+        testName: string?
     newCDPSession:
       parameters:
         page: Page?
