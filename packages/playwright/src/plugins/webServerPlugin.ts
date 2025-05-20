@@ -16,9 +16,9 @@
 import net from 'net';
 import path from 'path';
 
-import { launchProcess, isURLAvailable, monotonicTime, raceAgainstDeadline } from 'playwright-core/lib/utils';
-import { colors } from 'playwright-core/lib/utils';
-import { debug } from 'playwright-core/lib/utilsBundle';
+import { launchProcess, isURLAvailable, monotonicTime, raceAgainstDeadline } from '@shopby/playwright-core/lib/utils';
+import { colors } from '@shopby/playwright-core/lib/utils';
+import { debug } from '@shopby/playwright-core/lib/utilsBundle';
 
 import type { TestRunnerPlugin } from '.';
 import type { FullConfig } from '../../types/testReporter';

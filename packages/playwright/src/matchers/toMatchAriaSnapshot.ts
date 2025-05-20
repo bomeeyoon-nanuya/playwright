@@ -18,7 +18,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { escapeTemplateString, isString } from 'playwright-core/lib/utils';
+import { escapeTemplateString, isString } from '@shopby/playwright-core/lib/utils';
 
 import {  kNoElementsFoundError, matcherHint } from './matcherHint';
 import { EXPECTED_COLOR } from '../common/expectBundle';

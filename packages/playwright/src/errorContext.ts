@@ -17,7 +17,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
-import { parseErrorStack } from 'playwright-core/lib/utils';
+import { parseErrorStack } from '@shopby/playwright-core/lib/utils';
 
 import { stripAnsiEscapes } from './util';
 import { codeFrameColumns } from './transform/babelBundle';

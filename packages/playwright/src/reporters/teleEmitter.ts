@@ -16,7 +16,7 @@
 
 import path from 'path';
 
-import { createGuid } from 'playwright-core/lib/utils';
+import { createGuid } from '@shopby/playwright-core/lib/utils';
 
 import { serializeRegexPatterns } from '../isomorphic/teleReceiver';
 

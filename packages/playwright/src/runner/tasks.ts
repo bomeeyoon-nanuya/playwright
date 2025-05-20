@@ -18,8 +18,8 @@ import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
 
-import { monotonicTime, removeFolders } from 'playwright-core/lib/utils';
-import { debug } from 'playwright-core/lib/utilsBundle';
+import { monotonicTime, removeFolders } from '@shopby/playwright-core/lib/utils';
+import { debug } from '@shopby/playwright-core/lib/utilsBundle';
 
 import { Dispatcher  } from './dispatcher';
 import { FailureTracker } from './failureTracker';
@@ -41,7 +41,7 @@ import type { Task } from './taskRunner';
 import type { FullResult } from '../../types/testReporter';
 import type { FullConfigInternal, FullProjectInternal } from '../common/config';
 import type { InternalReporter } from '../reporters/internalReporter';
-import type { ManualPromise } from 'playwright-core/lib/utils';
+import type { ManualPromise } from '@shopby/playwright-core/lib/utils';
 
 const readDirAsync = promisify(fs.readdir);
 

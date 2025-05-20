@@ -1,6 +1,6 @@
 {
   "name": "@shopby/playwright",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "ShopBy의 Playwright 기반 테스트 라이브러리",
   "repository": {
     "type": "git",

@@ -17,9 +17,9 @@
 import fs from 'fs';
 import path from 'path';
 
-import { compareBuffersOrStrings, getComparator, isString } from 'playwright-core/lib/utils';
-import { colors } from 'playwright-core/lib/utils';
-import { mime } from 'playwright-core/lib/utilsBundle';
+import { compareBuffersOrStrings, getComparator, isString } from '@shopby/playwright-core/lib/utils';
+import { colors } from '@shopby/playwright-core/lib/utils';
+import { mime } from '@shopby/playwright-core/lib/utilsBundle';
 
 import { addSuffixToFilePath, callLogText, expectTypes } from '../util';
 import {  matcherHint } from './matcherHint';
@@ -29,9 +29,9 @@ import type { MatcherResult } from './matcherHint';
 import type { ExpectMatcherStateInternal } from './matchers';
 import type { FullProjectInternal } from '../common/config';
 import type { TestInfoImpl, TestStepInfoImpl } from '../worker/testInfo';
-import type { Locator, Page } from 'playwright-core';
-import type { ExpectScreenshotOptions, Page as PageEx } from 'playwright-core/lib/client/page';
-import type { Comparator, ImageComparatorOptions } from 'playwright-core/lib/utils';
+import type { Locator, Page } from '@shopby/playwright-core';
+import type { ExpectScreenshotOptions, Page as PageEx } from '@shopby/playwright-core/lib/client/page';
+import type { Comparator, ImageComparatorOptions } from '@shopby/playwright-core/lib/utils';
 
 type NameOrSegments = string | string[];
 

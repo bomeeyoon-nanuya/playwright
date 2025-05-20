@@ -16,7 +16,7 @@
 
 import path from 'path';
 
-import { calculateSha1 } from 'playwright-core/lib/utils';
+import { calculateSha1 } from '@shopby/playwright-core/lib/utils';
 
 import { loadReporter } from './loadUtils';
 import { formatError, terminalScreen } from '../reporters/base';
