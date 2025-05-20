@@ -1,18 +1,16 @@
 {
-  "name": "playwright-core",
+  "name": "@shopby/playwright-core",
   "version": "1.53.0-next",
-  "description": "A high-level API to automate web browsers",
+  "description": "ShopBy의 Playwright 기반 테스트 라이브러리",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/microsoft/playwright.git"
+    "url": "git+https://github.com/bomeeyoon-nanuya/playwright.git"
   },
   "homepage": "https://playwright.dev",
   "engines": {
     "node": ">=18"
   },
-  "author": {
-    "name": "Microsoft Corporation"
-  },
+  "author": "Microsoft Corporation",
   "license": "Apache-2.0",
   "exports": {
     ".": {
@@ -40,5 +38,16 @@
   "bin": {
     "playwright-core": "cli.js"
   },
-  "types": "types/types.d.ts"
+  "types": "types/types.d.ts",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "bugs": {
+    "url": "https://github.com/bomeeyoon-nanuya/playwright/issues"
+  }
 }
