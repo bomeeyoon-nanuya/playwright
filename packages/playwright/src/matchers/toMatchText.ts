@@ -15,7 +15,7 @@
  */
 
 
-import { colors } from 'playwright-core/lib/utils';
+import { colors } from '@shopby/playwright-core/lib/utils';
 
 import { callLogText, expectTypes } from '../util';
 import {
@@ -27,7 +27,7 @@ import { EXPECTED_COLOR } from '../common/expectBundle';
 
 import type { MatcherResult } from './matcherHint';
 import type { ExpectMatcherState } from '../../types/test';
-import type { Locator } from 'playwright-core';
+import type { Locator } from '@shopby/playwright-core';
 
 export async function toMatchText(
   this: ExpectMatcherState,

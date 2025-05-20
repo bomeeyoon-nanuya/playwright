@@ -15,5 +15,5 @@
  * limitations under the License.
  */
 
-const { program } = require('playwright-core/lib/cli/program');
+const { program } = require('@shopby/playwright-core/lib/cli/program');
 program.parse(process.argv);

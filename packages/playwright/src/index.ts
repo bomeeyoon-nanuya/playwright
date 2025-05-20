@@ -17,8 +17,8 @@
 import fs from 'fs';
 import path from 'path';
 
-import * as playwrightLibrary from 'playwright-core';
-import { setBoxedStackPrefixes, asLocator, createGuid, currentZone, debugMode, isString, jsonStringifyForceASCII } from 'playwright-core/lib/utils';
+import * as playwrightLibrary from '@shopby/playwright-core';
+import { setBoxedStackPrefixes, asLocator, createGuid, currentZone, debugMode, isString, jsonStringifyForceASCII } from '@shopby/playwright-core/lib/utils';
 
 import { currentTestInfo } from './common/globals';
 import { rootTestType } from './common/testType';
@@ -27,9 +27,9 @@ import { attachErrorContext } from './errorContext';
 import type { Fixtures, PlaywrightTestArgs, PlaywrightTestOptions, PlaywrightWorkerArgs, PlaywrightWorkerOptions, ScreenshotMode, TestInfo, TestType, VideoMode } from '../types/test';
 import type { ContextReuseMode } from './common/config';
 import type { TestInfoImpl, TestStepInternal } from './worker/testInfo';
-import type { ApiCallData, ClientInstrumentation, ClientInstrumentationListener } from '../../playwright-core/src/client/clientInstrumentation';
-import type { Playwright as PlaywrightImpl } from '../../playwright-core/src/client/playwright';
-import type { APIRequestContext, Browser, BrowserContext, BrowserContextOptions, LaunchOptions, Page, Tracing, Video } from 'playwright-core';
+import type { ApiCallData, ClientInstrumentation, ClientInstrumentationListener } from '../../@shopby/playwright-core/srcsrc/client/clientInstrumentation';
+import type { Playwright as PlaywrightImpl } from '../../@shopby/playwright-core/srcsrc/client/playwright';
+import type { APIRequestContext, Browser, BrowserContext, BrowserContextOptions, LaunchOptions, Page, Tracing, Video } from '@shopby/playwright-core';
 
 export { expect } from './matchers/expect';
 export const _baseTest: TestType<{}, {}> = rootTestType.test;

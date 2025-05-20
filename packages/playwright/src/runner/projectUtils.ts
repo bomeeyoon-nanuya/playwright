@@ -18,8 +18,8 @@ import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
 
-import { escapeRegExp } from 'playwright-core/lib/utils';
-import { minimatch } from 'playwright-core/lib/utilsBundle';
+import { escapeRegExp } from '@shopby/playwright-core/lib/utils';
+import { minimatch } from '@shopby/playwright-core/lib/utilsBundle';
 
 import { createFileMatcher } from '../util';
 

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-import { urlMatches } from 'playwright-core/lib/utils';
-import { colors } from 'playwright-core/lib/utils';
+import { urlMatches } from '@shopby/playwright-core/lib/utils';
+import { colors } from '@shopby/playwright-core/lib/utils';
 
 import { printReceivedStringContainExpectedResult } from './expect';
 import {  matcherHint } from './matcherHint';
@@ -23,7 +23,7 @@ import { EXPECTED_COLOR, printReceived } from '../common/expectBundle';
 
 import type { MatcherResult } from './matcherHint';
 import type { ExpectMatcherState } from '../../types/test';
-import type { Page } from 'playwright-core';
+import type { Page } from '@shopby/playwright-core';
 
 export async function toHaveURLWithPredicate(
   this: ExpectMatcherState,

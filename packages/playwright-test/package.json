@@ -30,6 +30,6 @@
   },
   "scripts": {},
   "dependencies": {
-    "playwright": "1.53.0-next"
+    "@shopby/playwright": "1.0.2"
   }
 }

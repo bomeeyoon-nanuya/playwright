@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-import { getAsBooleanFromENV } from 'playwright-core/lib/utils';
-import { ms as milliseconds } from 'playwright-core/lib/utilsBundle';
+import { getAsBooleanFromENV } from '@shopby/playwright-core/lib/utils';
+import { ms as milliseconds } from '@shopby/playwright-core/lib/utilsBundle';
 
 import { TerminalReporter, stepSuffix } from './base';
 import { stripAnsiEscapes } from '../util';

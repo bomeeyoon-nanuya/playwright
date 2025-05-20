@@ -17,7 +17,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { removeFolders } from 'playwright-core/lib/utils';
+import { removeFolders } from '@shopby/playwright-core/lib/utils';
 
 import { ProcessHost } from './processHost';
 import { stdioChunkToParams } from '../common/ipc';

@@ -19,7 +19,7 @@ import { kNoElementsFoundError, matcherHint } from './matcherHint';
 
 import type { MatcherResult } from './matcherHint';
 import type { ExpectMatcherState } from '../../types/test';
-import type { Locator } from 'playwright-core';
+import type { Locator } from '@shopby/playwright-core';
 
 export async function toBeTruthy(
   this: ExpectMatcherState,

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { ManualPromise } from 'playwright-core/lib/utils';
+import { ManualPromise } from '@shopby/playwright-core/lib/utils';
 
 import {    fixtureParameterNames } from '../common/fixtures';
 import { filterStackFile, formatLocation } from '../util';

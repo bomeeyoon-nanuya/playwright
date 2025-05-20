@@ -18,11 +18,11 @@ import fs from 'fs';
 import path from 'path';
 import { Transform } from 'stream';
 
-import { HttpServer, MultiMap, assert, calculateSha1, getPackageManagerExecCommand, copyFileAndMakeWritable, gracefullyProcessExitDoNotHang, removeFolders, sanitizeForFilePath, toPosixPath } from 'playwright-core/lib/utils';
-import { colors } from 'playwright-core/lib/utils';
-import { open } from 'playwright-core/lib/utilsBundle';
-import { mime } from 'playwright-core/lib/utilsBundle';
-import { yazl } from 'playwright-core/lib/zipBundle';
+import { HttpServer, MultiMap, assert, calculateSha1, getPackageManagerExecCommand, copyFileAndMakeWritable, gracefullyProcessExitDoNotHang, removeFolders, sanitizeForFilePath, toPosixPath } from '@shopby/playwright-core/lib/utils';
+import { colors } from '@shopby/playwright-core/lib/utils';
+import { open } from '@shopby/playwright-core/lib/utilsBundle';
+import { mime } from '@shopby/playwright-core/lib/utilsBundle';
+import { yazl } from '@shopby/playwright-core/lib/zipBundle';
 
 import { CommonReporterOptions, formatError, formatResultFailure, internalScreen } from './base';
 import { codeFrameColumns } from '../transform/babelBundle';
@@ -32,7 +32,7 @@ import type { ReporterV2 } from './reporterV2';
 import type { HtmlReporterOptions as HtmlReporterConfigOptions, Metadata, TestAnnotation } from '../../types/test';
 import type * as api from '../../types/testReporter';
 import type { HTMLReport, Stats, TestAttachment, TestCase, TestCaseSummary, TestFile, TestFileSummary, TestResult, TestStep } from '@html-reporter/types';
-import type { ZipFile } from 'playwright-core/lib/zipBundle';
+import type { ZipFile } from '@shopby/playwright-core/lib/zipBundle';
 import type { TransformCallback } from 'stream';
 
 type TestEntry = {

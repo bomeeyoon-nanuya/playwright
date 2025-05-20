@@ -17,8 +17,8 @@
 import child_process from 'child_process';
 import { EventEmitter } from 'events';
 
-import { assert, timeOrigin } from 'playwright-core/lib/utils';
-import { debug } from 'playwright-core/lib/utilsBundle';
+import { assert, timeOrigin } from '@shopby/playwright-core/lib/utils';
+import { debug } from '@shopby/playwright-core/lib/utilsBundle';
 
 import type { EnvProducedPayload, ProcessInitParams } from '../common/ipc';
 import type { ProtocolResponse } from '../common/process';

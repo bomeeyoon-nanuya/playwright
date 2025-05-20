@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-import { constructURLBasedOnBaseURL, isRegExp, isString, isTextualMimeType, pollAgainstDeadline, serializeExpectedTextValues } from 'playwright-core/lib/utils';
-import { colors } from 'playwright-core/lib/utils';
+import { constructURLBasedOnBaseURL, isRegExp, isString, isTextualMimeType, pollAgainstDeadline, serializeExpectedTextValues } from '@shopby/playwright-core/lib/utils';
+import { colors } from '@shopby/playwright-core/lib/utils';
 
 import { callLogText, expectTypes } from '../util';
 import { toBeTruthy } from './toBeTruthy';
@@ -28,8 +28,8 @@ import { TestInfoImpl } from '../worker/testInfo';
 
 import type { ExpectMatcherState } from '../../types/test';
 import type { TestStepInfoImpl } from '../worker/testInfo';
-import type { APIResponse, Locator, Page } from 'playwright-core';
-import type { FrameExpectParams } from 'playwright-core/lib/client/types';
+import type { APIResponse, Locator, Page } from '@shopby/playwright-core';
+import type { FrameExpectParams } from '@shopby/playwright-core/lib/client/types';
 
 export type ExpectMatcherStateInternal = ExpectMatcherState & { _stepInfo?: TestStepInfoImpl };
 

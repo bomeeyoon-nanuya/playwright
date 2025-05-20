@@ -75,6 +75,7 @@ export class ContextRecorder extends EventEmitter {
       contextOptions: { ...params.contextOptions },
       deviceName: params.device,
       saveStorage: params.saveStorage,
+      testName: params.testName,
     };
 
     this._collection = new RecorderCollection(this._pageAliases);

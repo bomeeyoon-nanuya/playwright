@@ -18,9 +18,9 @@ import fs from 'fs';
 import path from 'path';
 import util from 'util';
 
-import { installRootRedirect, openTraceInBrowser, openTraceViewerApp, registry, startTraceViewerServer } from 'playwright-core/lib/server';
-import { ManualPromise, isUnderTest, gracefullyProcessExitDoNotHang } from 'playwright-core/lib/utils';
-import { open, debug } from 'playwright-core/lib/utilsBundle';
+import { installRootRedirect, openTraceInBrowser, openTraceViewerApp, registry, startTraceViewerServer } from '@shopby/playwright-core/lib/server';
+import { ManualPromise, isUnderTest, gracefullyProcessExitDoNotHang } from '@shopby/playwright-core/lib/utils';
+import { open, debug } from '@shopby/playwright-core/lib/utilsBundle';
 
 import { createErrorCollectingReporter, createReporterForTestServer, createReporters } from './reporters';
 import { SigIntWatcher } from './sigIntWatcher';
@@ -42,8 +42,8 @@ import type { ConfigCLIOverrides } from '../common/ipc';
 import type { ReportEntry, TestServerInterface, TestServerInterfaceEventEmitters } from '../isomorphic/testServerInterface';
 import type { TestRunnerPluginRegistration } from '../plugins';
 import type { ReporterV2 } from '../reporters/reporterV2';
-import type { TraceViewerRedirectOptions, TraceViewerServerOptions } from 'playwright-core/lib/server/trace/viewer/traceViewer';
-import type { HttpServer, Transport } from 'playwright-core/lib/utils';
+import type { TraceViewerRedirectOptions, TraceViewerServerOptions } from '@shopby/playwright-core/lib/server/trace/viewer/traceViewer';
+import type { HttpServer, Transport } from '@shopby/playwright-core/lib/utils';
 
 const originalDebugLog = debug.log;
 const originalStdoutWrite = process.stdout.write;

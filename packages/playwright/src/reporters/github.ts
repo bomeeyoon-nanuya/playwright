@@ -16,8 +16,8 @@
 
 import path from 'path';
 
-import { noColors } from 'playwright-core/lib/utils';
-import { ms as milliseconds } from 'playwright-core/lib/utilsBundle';
+import { noColors } from '@shopby/playwright-core/lib/utils';
+import { ms as milliseconds } from '@shopby/playwright-core/lib/utilsBundle';
 
 import { TerminalReporter, formatResultFailure, formatRetry } from './base';
 import { stripAnsiEscapes } from '../util';
