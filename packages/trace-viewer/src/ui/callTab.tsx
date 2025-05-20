@@ -105,6 +105,18 @@ function propertyToString(event: ActionTraceEvent, name: string, value: any, sdk
     value = parseSerializedValue(value, new Array(10).fill({ handle: '<handle>' }));
   if (name === 'selector')
     return { text: asLocator(sdkLanguage || 'javascript', event.params.selector), type: 'locator', name: 'locator' };
+
+  // 특별히 waitFor 관련 옵션 처리
+  if (name === 'options' && event.method?.startsWith('waitFor')) {
+    // 옵션 객체를 보기 좋게 표시
+    return { text: JSON.stringify(value, null, 2), type: 'object', name };
+  }
+  // waitForLoadState, waitForResponse 등의 특수 파라미터 처리
+  if (name === 'state' && event.method === 'waitForLoadState')
+    return { text: String(value), type: 'string', name };
+  if (name === 'url' && event.method === 'waitForResponse')
+    return { text: String(value), type: 'string', name };
+
   const type = typeof value;
   if (type !== 'object' || value === null)
     return { text: String(value), type, name };

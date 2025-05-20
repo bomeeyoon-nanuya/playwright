@@ -376,6 +376,9 @@ export class Recorder implements InstrumentationListener, IRecorder {
   }
 
   private _isRecording() {
+    if (this._mode?.includes('waitingFor'))
+      return true;
+
     return ['recording', 'assertingText', 'assertingVisibility', 'assertingValue', 'assertingSnapshot'].includes(this._mode);
   }
 

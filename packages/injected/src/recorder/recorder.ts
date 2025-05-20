@@ -15,6 +15,7 @@
  */
 
 import clipPaths from './clipPaths';
+import { WaitState, createWaitOptionsContent } from './waitForOptionsContent';
 
 import type { Point } from '@isomorphic/types';
 import type { Highlight, HighlightEntry } from '../highlight';
@@ -59,6 +60,7 @@ interface RecorderTool {
   onMouseLeave?(event: MouseEvent): void;
   onFocus?(event: Event): void;
   onScroll?(event: Event): void;
+  initializeToolUI?(): void;
 }
 
 class NoneTool implements RecorderTool {
@@ -796,6 +798,111 @@ class TextAssertionTool implements RecorderTool {
   }
 }
 
+class WaitForTool implements RecorderTool {
+  private _recorder: Recorder;
+  private _hoverHighlight: { selector: string, elements: Element[], color: string } | null = null;
+  private _dialog: Dialog;
+  private _currentWaitState: WaitState | null = null;
+  private _currentTimeout: number = 5000;
+
+  static _isAnyDialogShowing = false;
+
+  constructor(recorder: Recorder) {
+    this._recorder = recorder;
+    this._dialog = new Dialog(recorder, {
+      styles: {
+        width: '920px',
+      }
+    });
+  }
+
+  cursor() {
+    return 'pointer';
+  }
+
+  cleanup() {
+    this._dialog.close();
+    this._hoverHighlight = null;
+  }
+
+  initializeToolUI() {
+    const window = this._recorder.injectedScript.window;
+    if (window.top === window) {
+      setTimeout(() => {
+        if (!WaitForTool._isAnyDialogShowing && !this._dialog.isShowing())
+          this._showDialog();
+      }, 0);
+    }
+  }
+
+  onClick(event: MouseEvent) {
+    consumeEvent(event);
+    const window = this._recorder.injectedScript.window;
+    if (window.top === window && !this._dialog.isShowing() && !WaitForTool._isAnyDialogShowing)
+      this._showDialog();
+  }
+
+  showDialog() {
+    const window = this._recorder.injectedScript.window;
+    if (window.top === window && !this._dialog.isShowing() && !WaitForTool._isAnyDialogShowing)
+      this._showDialog();
+  }
+
+  onMouseMove(event: MouseEvent) {
+    consumeEvent(event);
+  }
+
+  private _showDialog() {
+    // 항상 플래그 리셋하여 모달이 항상 표시되도록 보장
+    WaitForTool._isAnyDialogShowing = false;
+
+    const div = this._recorder.document.createElement('div');
+    div.classList.add('wait-for-dialog');
+
+    div.style.padding = '24px';
+    div.style.minWidth = '340px';
+    div.style.backgroundColor = '#ffffff';
+    div.style.borderRadius = '8px';
+    div.style.boxShadow = '0 12px 24px rgba(0, 0, 0, 0.3)';
+
+    div.innerHTML = `
+      <div class="wait-for-dialog-content" style="text-align: center;">
+      </div>
+    `;
+
+    const content = this._createWaitOptionsContent();
+    div.querySelector('.wait-for-dialog-content')!.appendChild(content);
+
+    this._dialog.show({
+      label: '대기 옵션 설정',
+      body: div,
+      onCommit: () => {
+        WaitForTool._isAnyDialogShowing = false;
+        this._recorder.setMode('recording');
+      },
+      onCancel: () => {
+        WaitForTool._isAnyDialogShowing = false;
+        this._recorder.setMode('recording');
+      }
+    });
+  }
+
+  private _createWaitOptionsContent(): HTMLElement {
+    return createWaitOptionsContent({
+      recorder: this._recorder,
+      document: this._recorder.document,
+      currentWaitState: this._currentWaitState as WaitState,
+      currentTimeout: this._currentTimeout,
+      onWaitStateChange: state => {
+        this._currentWaitState = state;
+      },
+      onTimeoutChange: timeout => {
+        this._currentTimeout = timeout;
+      }
+    });
+  }
+}
+
 class Overlay {
   private _recorder: Recorder;
   private _listeners: (() => void)[] = [];
@@ -807,6 +914,8 @@ class Overlay {
   private _assertTextToggle: HTMLElement;
   private _assertValuesToggle: HTMLElement;
   private _assertSnapshotToggle: HTMLElement;
+  private _waitForToggle: HTMLElement;
+  private _enhancedAssertToggle: HTMLElement;
   private _offsetX = 0;
   private _dragState: { offsetX: number, dragStart: { x: number, y: number } } | undefined;
   private _measure: { width: number, height: number } = { width: 0, height: 0 };
@@ -823,40 +932,52 @@ class Overlay {
     toolsListElement.appendChild(this._dragHandle);
 
     this._recordToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._recordToggle.title = 'Record';
+    this._recordToggle.title = '녹화';
     this._recordToggle.classList.add('record');
     this._recordToggle.appendChild(this._recorder.document.createElement('x-div'));
     toolsListElement.appendChild(this._recordToggle);
 
     this._pickLocatorToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._pickLocatorToggle.title = 'Pick locator';
+    this._pickLocatorToggle.title = '요소 선택';
     this._pickLocatorToggle.classList.add('pick-locator');
     this._pickLocatorToggle.appendChild(this._recorder.document.createElement('x-div'));
     toolsListElement.appendChild(this._pickLocatorToggle);
 
     this._assertVisibilityToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._assertVisibilityToggle.title = 'Assert visibility';
+    this._assertVisibilityToggle.title = '화면에 표시 확인';
     this._assertVisibilityToggle.classList.add('visibility');
     this._assertVisibilityToggle.appendChild(this._recorder.document.createElement('x-div'));
     toolsListElement.appendChild(this._assertVisibilityToggle);
 
     this._assertTextToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._assertTextToggle.title = 'Assert text';
+    this._assertTextToggle.title = '텍스트 검증';
     this._assertTextToggle.classList.add('text');
     this._assertTextToggle.appendChild(this._recorder.document.createElement('x-div'));
     toolsListElement.appendChild(this._assertTextToggle);
 
     this._assertValuesToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._assertValuesToggle.title = 'Assert value';
+    this._assertValuesToggle.title = '값 검증';
     this._assertValuesToggle.classList.add('value');
     this._assertValuesToggle.appendChild(this._recorder.document.createElement('x-div'));
     toolsListElement.appendChild(this._assertValuesToggle);
 
     this._assertSnapshotToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._assertSnapshotToggle.title = 'Assert snapshot';
+    this._assertSnapshotToggle.title = '스냅샷 검증';
     this._assertSnapshotToggle.classList.add('snapshot');
     this._assertSnapshotToggle.appendChild(this._recorder.document.createElement('x-div'));
     toolsListElement.appendChild(this._assertSnapshotToggle);
+
+    this._waitForToggle = this._recorder.document.createElement('x-pw-tool-item');
+    this._waitForToggle.title = '대기';
+    this._waitForToggle.classList.add('wait-for');
+    this._waitForToggle.appendChild(this._recorder.document.createElement('x-div'));
+    toolsListElement.appendChild(this._waitForToggle);
+
+    this._enhancedAssertToggle = this._recorder.document.createElement('x-pw-tool-item');
+    this._enhancedAssertToggle.title = '고급 검증';
+    this._enhancedAssertToggle.classList.add('enhanced-assert');
+    this._enhancedAssertToggle.appendChild(this._recorder.document.createElement('x-div'));
+    toolsListElement.appendChild(this._enhancedAssertToggle);
 
     this._updateVisualPosition();
     this._refreshListeners();
@@ -876,7 +997,7 @@ class Overlay {
       addEventListener(this._pickLocatorToggle, 'click', () => {
         if (this._pickLocatorToggle.classList.contains('disabled'))
           return;
-        const newMode: Record<Mode, Mode> = {
+        const newMode = {
           'inspecting': 'standby',
           'none': 'inspecting',
           'standby': 'inspecting',
@@ -886,7 +1007,9 @@ class Overlay {
           'assertingVisibility': 'recording-inspecting',
           'assertingValue': 'recording-inspecting',
           'assertingSnapshot': 'recording-inspecting',
-        };
+          'waitingFor': 'recording-inspecting',
+          'enhancedAsserting': 'recording-inspecting',
+        } as const;
         this._recorder.setMode(newMode[this._recorder.state.mode]);
       }),
       addEventListener(this._assertVisibilityToggle, 'click', () => {
@@ -904,6 +1027,14 @@ class Overlay {
       addEventListener(this._assertSnapshotToggle, 'click', () => {
         if (!this._assertSnapshotToggle.classList.contains('disabled'))
           this._recorder.setMode(this._recorder.state.mode === 'assertingSnapshot' ? 'recording' : 'assertingSnapshot');
+      }),
+      addEventListener(this._waitForToggle, 'click', () => {
+        if (!this._waitForToggle.classList.contains('disabled'))
+          this._recorder.setMode(this._recorder.state.mode === 'waitingFor' ? 'recording' : 'waitingFor');
+      }),
+      addEventListener(this._enhancedAssertToggle, 'click', () => {
+        if (!this._enhancedAssertToggle.classList.contains('disabled'))
+          this._recorder.setMode(this._recorder.state.mode === 'enhancedAsserting' ? 'recording' : 'enhancedAsserting');
       }),
     ];
   }
@@ -929,6 +1060,10 @@ class Overlay {
     this._assertValuesToggle.classList.toggle('disabled', state.mode === 'none' || state.mode === 'standby' || state.mode === 'inspecting');
     this._assertSnapshotToggle.classList.toggle('toggled', state.mode === 'assertingSnapshot');
     this._assertSnapshotToggle.classList.toggle('disabled', state.mode === 'none' || state.mode === 'standby' || state.mode === 'inspecting');
+    this._waitForToggle.classList.toggle('toggled', state.mode === 'waitingFor');
+    this._waitForToggle.classList.toggle('disabled', state.mode === 'none' || state.mode === 'standby' || state.mode === 'inspecting');
+    this._enhancedAssertToggle.classList.toggle('toggled', state.mode === 'enhancedAsserting');
+    this._enhancedAssertToggle.classList.toggle('disabled', state.mode === 'none' || state.mode === 'standby' || state.mode === 'inspecting');
     if (this._offsetX !== state.overlay.offsetX) {
       this._offsetX = state.overlay.offsetX;
       this._updateVisualPosition();
@@ -939,12 +1074,14 @@ class Overlay {
       this._showOverlay();
   }
 
-  flashToolSucceeded(tool: 'assertingVisibility' | 'assertingSnapshot' | 'assertingValue') {
+  flashToolSucceeded(tool: 'assertingVisibility' | 'assertingSnapshot' | 'assertingValue' | 'waitingFor') {
     let element: Element;
     if (tool === 'assertingVisibility')
       element = this._assertVisibilityToggle;
     else if (tool === 'assertingSnapshot')
       element = this._assertSnapshotToggle;
+    else if (tool === 'waitingFor')
+      element = this._waitForToggle;
     else
       element = this._assertValuesToggle;
     element.classList.add('succeeded');
@@ -1029,6 +1166,7 @@ export class Recorder {
     this.document = injectedScript.document;
     this.injectedScript = injectedScript;
     this.highlight = injectedScript.createHighlight();
+
     this._tools = {
       'none': new NoneTool(),
       'standby': new NoneTool(),
@@ -1039,12 +1177,16 @@ export class Recorder {
       'assertingVisibility': new InspectTool(this, true),
       'assertingValue': new TextAssertionTool(this, 'value'),
       'assertingSnapshot': new TextAssertionTool(this, 'snapshot'),
+      'waitingFor': new WaitForTool(this),
+      'enhancedAsserting': new NoneTool(),
     };
     this._currentTool = this._tools.none;
+
     if (injectedScript.window.top === injectedScript.window) {
       this.overlay = new Overlay(this);
       this.overlay.setUIState(this.state);
     }
+
     this._stylesheet = new injectedScript.window.CSSStyleSheet();
     this._stylesheet.replaceSync(`
       body[data-pw-cursor=pointer] *, body[data-pw-cursor=pointer] *::after { cursor: pointer !important; }
@@ -1080,7 +1222,6 @@ export class Recorder {
     ];
 
     this.highlight.install();
-    // some frameworks erase the DOM on hydration, this ensures it's reattached
     let recreationInterval: number | undefined;
     const recreate = () => {
       this.highlight.install();
@@ -1101,6 +1242,10 @@ export class Recorder {
     this._currentTool.cleanup?.();
     this.clearHighlight();
     this._currentTool = newTool;
+
+    if (this._currentTool.initializeToolUI)
+      this._currentTool.initializeToolUI();
+
     this.injectedScript.document.body?.setAttribute('data-pw-cursor', newTool.cursor());
   }
 
@@ -1348,13 +1493,26 @@ class Dialog {
   private _recorder: Recorder;
   private _dialogElement: HTMLElement | null = null;
   private _keyboardListener: ((event: KeyboardEvent) => void) | undefined;
+  private _dragState: { startX: number, startY: number, origX: number, origY: number } | null = null;
+  private _dragListeners: (() => void)[] = [];
+  private _styles: Record<string, string> | undefined;
 
-  constructor(recorder: Recorder) {
+  constructor(recorder: Recorder, options?: { styles?: Record<string, string> }) {
     this._recorder = recorder;
+    this._styles = options?.styles;
   }
 
   isShowing(): boolean {
     return !!this._dialogElement;
+  }
+
+  moveTo(top: number, left: number): void {
+    if (!this._dialogElement)
+      return;
+
+    this._dialogElement.style.position = 'fixed';
+    this._dialogElement.style.top = `${top}px`;
+    this._dialogElement.style.left = `${left}px`;
   }
 
   show(options: {
@@ -1362,6 +1520,7 @@ class Dialog {
     body: Element;
     onCommit: () => void;
     onCancel?: () => void;
+    width?: string;
   }) {
     const acceptButton = this._recorder.document.createElement('x-pw-tool-item');
     acceptButton.title = 'Accept';
@@ -1379,6 +1538,24 @@ class Dialog {
     });
 
     this._dialogElement = this._recorder.document.createElement('x-pw-dialog');
+
+    this._dialogElement.style.position = 'fixed';
+    this._dialogElement.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.3)';
+    this._dialogElement.style.zIndex = '10000';
+
+    if (options.width)
+      this._dialogElement.style.width = options.width;
+    else if (this._styles?.width)
+      this._dialogElement.style.width = this._styles.width;
+
+    if (this._styles) {
+      for (const [property, value] of Object.entries(this._styles)) {
+        if (property !== 'width')
+          this._dialogElement.style[property as any] = value;
+
+      }
+    }
+
     this._keyboardListener = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         this.close();
@@ -1394,6 +1571,16 @@ class Dialog {
 
     this._recorder.document.addEventListener('keydown', this._keyboardListener, true);
     const toolbarElement = this._recorder.document.createElement('x-pw-tools-list');
+
+    const gripperElement = this._recorder.document.createElement('x-pw-tool-gripper');
+    gripperElement.title = '드래그하여 이동';
+    gripperElement.style.cursor = 'move';
+    gripperElement.style.margin = '0 8px 0 0';
+    gripperElement.appendChild(this._recorder.document.createElement('x-div'));
+    gripperElement.addEventListener('mousedown', this._onDragStart.bind(this));
+
+    toolbarElement.appendChild(gripperElement);
+
     const labelElement = this._recorder.document.createElement('label');
     labelElement.textContent = options.label;
     toolbarElement.appendChild(labelElement);
@@ -1401,19 +1588,19 @@ class Dialog {
     toolbarElement.appendChild(acceptButton);
     toolbarElement.appendChild(cancelButton);
 
+    toolbarElement.style.cursor = 'default';
+
     this._dialogElement.appendChild(toolbarElement);
     const bodyElement = this._recorder.document.createElement('x-pw-dialog-body');
     bodyElement.appendChild(options.body);
     this._dialogElement.appendChild(bodyElement);
     this._recorder.highlight.appendChild(this._dialogElement);
-    return this._dialogElement;
-  }
 
-  moveTo(top: number, left: number) {
-    if (!this._dialogElement)
-      return;
-    this._dialogElement.style.top = top + 'px';
-    this._dialogElement.style.left = left + 'px';
+    this._centerDialog();
+
+    this._setupDragListeners();
+
+    return this._dialogElement;
   }
 
   close() {
@@ -1422,6 +1609,79 @@ class Dialog {
     this._dialogElement.remove();
     this._recorder.document.removeEventListener('keydown', this._keyboardListener!);
     this._dialogElement = null;
+
+    this._removeDragListeners();
+  }
+
+  private _centerDialog() {
+    if (!this._dialogElement)
+      return;
+
+    const window = this._recorder.injectedScript.window;
+    const windowWidth = window.innerWidth;
+
+    const rect = this._dialogElement.getBoundingClientRect();
+    const dialogWidth = rect.width;
+
+    const left = Math.max(0, (windowWidth - dialogWidth) / 2);
+
+    this._dialogElement.style.left = left + 'px';
+  }
+
+  private _onDragStart(event: MouseEvent) {
+    if (!this._dialogElement || event.button !== 0)
+      return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const rect = this._dialogElement.getBoundingClientRect();
+
+    this._dragState = {
+      startX: event.clientX,
+      startY: event.clientY,
+      origX: rect.left,
+      origY: rect.top
+    };
+  }
+
+  private _onDragMove(event: MouseEvent) {
+    if (!this._dragState || !this._dialogElement)
+      return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const dx = event.clientX - this._dragState.startX;
+    const dy = event.clientY - this._dragState.startY;
+
+    const newLeft = this._dragState.origX + dx;
+    const newTop = this._dragState.origY + dy;
+
+    this._dialogElement.style.left = newLeft + 'px';
+    this._dialogElement.style.top = newTop + 'px';
+  }
+
+  private _onDragEnd() {
+    this._dragState = null;
+  }
+
+  private _setupDragListeners() {
+    this._removeDragListeners();
+
+    const onDragMove = this._onDragMove.bind(this);
+    const onDragEnd = this._onDragEnd.bind(this);
+
+    this._dragListeners = [
+      addEventListener(this._recorder.document, 'mousemove', onDragMove as EventListener, true),
+      addEventListener(this._recorder.document, 'mouseup', onDragEnd as EventListener, true)
+    ];
+  }
+
+  private _removeDragListeners() {
+    for (const remove of this._dragListeners)
+      remove();
+    this._dragListeners = [];
   }
 }
 
@@ -1516,7 +1776,6 @@ function entriesForSelectorHighlight(injectedScript: InjectedScript, language: L
 }
 
 export type SvgJson = {
-  // for instance, <g> elements are not supported in clipPaths
   tagName: 'svg' | 'defs' | 'clipPath' | 'path';
   attrs?: Record<string, string>;
   children?: SvgJson[];

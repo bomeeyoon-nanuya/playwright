@@ -122,7 +122,19 @@ export class JavaScriptLanguageGenerator implements LanguageGenerator {
         const commentIfNeeded = this._isTest ? '' : '// ';
         return `${commentIfNeeded}await expect(${subject}.${this._asLocator(action.selector)}).toMatchAriaSnapshot(${quoteMultiline(action.snapshot, `${commentIfNeeded}  `)});`;
       }
+      case 'waitForSelector': {
+        const options = action.options || {};
+        const optionsString = formatOptions(options, false);
+        return `await ${subject}.waitForSelector(${this._asLocator(action.selector)}${optionsString ? ', ' + optionsString : ''});`;
+      }
+      case 'waitForTimeout': {
+        const timeout = action.options?.timeout ?? 0;
+        if (typeof timeout === 'number')
+          return `await ${subject}.waitForTimeout(${timeout});`;
+        return `await ${subject}.waitForTimeout(${quote(timeout)});`;
+      }
     }
+    return `// 알 수 없는 액션: ${action.name}`;
   }
 
   private _asLocator(selector: string) {
@@ -242,6 +254,9 @@ export class JavaScriptFormatter {
   }
 
   add(text: string) {
+    if (!text)
+      return;
+
     const trim = isMultilineString(text) ? (line: string) => line : (line: string) => line.trim();
     this._lines.push(...text.trim().split('\n').map(trim));
   }
@@ -292,5 +307,7 @@ export function quoteMultiline(text: string, indent = '  ') {
 }
 
 function isMultilineString(text: string) {
+  if (!text)
+    return false;
   return text.match(/`[\S\s]*`/)?.[0].includes('\n');
 }
