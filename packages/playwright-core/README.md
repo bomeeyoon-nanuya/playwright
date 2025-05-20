@@ -1,3 +1,3 @@
-# playwright-core
+# @shopby/playwright-core
 
-This package contains the no-browser flavor of [Playwright](http://github.com/microsoft/playwright).
+shopby에서 사용하기 위해 포크된 [Playwright 1.53.0-next](http://github.com/microsoft/playwright)의 버전입니다.
