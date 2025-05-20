@@ -252,27 +252,6 @@ const waitOptions = [
 ];
 
 /**
- * 빠른 시간 버튼 클릭 핸들러
- */
-function handleQuickButtonClick(button: HTMLButtonElement, value: number, onTimeoutChange: (timeout: number) => void, quickButtonsContainer: HTMLElement) {
-  // 모든 버튼 스타일 초기화
-  quickButtonsContainer.querySelectorAll('button').forEach(b => {
-    const btnEl = b as HTMLElement;
-    btnEl.style.backgroundColor = '#f9fafb';
-    btnEl.style.color = '#4b5563';
-    btnEl.style.fontWeight = 'normal';
-  });
-
-  // 선택된 버튼 강조
-  button.style.backgroundColor = '#e0edff';
-  button.style.color = '#2563eb';
-  button.style.fontWeight = '500';
-
-  // 값 설정
-  onTimeoutChange(value);
-}
-
-/**
  * 헬퍼 함수: 클릭된 요소에서 가장 가까운 선택자에 해당하는 부모 요소 찾기
  */
 function findClosestElement(element: HTMLElement, selector: string): HTMLElement | null {
@@ -826,6 +805,15 @@ const updateRightSectionUI = (
         recorder
     );
     rightSection.appendChild(resultElement);
+  } else if (waitState) {
+    // 다른 대기 상태에 대한 UI 업데이트 처리
+    testFn({
+      recorder,
+      container: rightSection,
+      waitState,
+      currentTimeout,
+      onTimeoutChange: optionContext.value.onTimeoutChange,
+    });
   } else {
     // 안내 메시지 표시
     rightSection.appendChild(placeholderContainer);
@@ -859,6 +847,9 @@ export function createWaitOptionsContent({
   content.style.maxHeight = '80vh'; // 최대 높이 제한
   content.style.overflow = 'auto'; // 내용이 많을 경우 스크롤 가능하도록
   content.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+
+  // 현재 타임아웃 값 관리를 위한 상태 변수
+  let activeTimeout = currentTimeout;
 
   // 1. 왼쪽 영역 (옵션 선택 영역)
   const leftSection = document.createElement('div');
@@ -896,6 +887,11 @@ export function createWaitOptionsContent({
     optionCard.style.backgroundColor = '#ffffff';
     optionCard.style.borderColor = '#e5e7eb';
     optionCard.style.boxShadow = 'none';
+
+    // 현재 waitState가 있고 이 카드와 일치하면 선택된 스타일 적용
+    if (currentWaitState && currentWaitState === option.id)
+      highlightSelectedCard(optionCard);
+
 
     // 아이콘 컨테이너
     const iconContainer = document.createElement('div');
@@ -1010,7 +1006,7 @@ export function createWaitOptionsContent({
 
   const timeoutInput = document.createElement('input');
   timeoutInput.type = 'number';
-  timeoutInput.value = String(currentTimeout);
+  timeoutInput.value = String(activeTimeout);
   timeoutInput.min = '100';
   timeoutInput.step = '500';
   timeoutInput.style.width = '100%';
@@ -1031,72 +1027,6 @@ export function createWaitOptionsContent({
     timeoutInput.style.borderColor = '#d1d5db';
     timeoutInput.style.boxShadow = 'none';
   });
-
-  timeoutInput.addEventListener('input', e => {
-    const value = parseInt((e.target as HTMLInputElement).value, 10);
-    if (!isNaN(value) && value > 0)
-      onTimeoutChange(value);
-  });
-
-  inputGroup.appendChild(timeoutInput);
-
-  // 빠른 시간 선택 버튼들
-  const quickTimeButtons = [
-    { value: 1000, label: '1초' },
-    { value: 3000, label: '3초' },
-    { value: 5000, label: '5초' },
-    { value: 10000, label: '10초' }
-  ];
-
-  const quickButtonsContainer = document.createElement('div');
-  quickButtonsContainer.style.display = 'flex';
-  quickButtonsContainer.style.marginTop = '8px';
-  quickButtonsContainer.style.gap = '8px';
-
-  quickTimeButtons.forEach(btn => {
-    const button = document.createElement('button');
-    button.textContent = btn.label;
-    button.style.padding = '6px 10px';
-    button.style.fontSize = '12px';
-    button.style.borderRadius = '4px';
-    button.style.border = '1px solid #d1d5db';
-    button.style.backgroundColor = currentTimeout === btn.value ? '#e0edff' : '#f9fafb';
-    button.style.color = currentTimeout === btn.value ? '#2563eb' : '#4b5563';
-    button.style.cursor = 'pointer';
-    button.style.transition = 'all 0.2s ease';
-    button.style.fontWeight = currentTimeout === btn.value ? '500' : 'normal';
-
-    button.addEventListener('mouseover', () => {
-      if (currentTimeout !== btn.value)
-        button.style.backgroundColor = '#f3f4f6';
-    });
-
-    button.addEventListener('mouseout', () => {
-      if (currentTimeout !== btn.value)
-        button.style.backgroundColor = '#f9fafb';
-    });
-
-    button.addEventListener('click', () => {
-      handleQuickButtonClick(button, btn.value, onTimeoutChange, quickButtonsContainer);
-    });
-
-    quickButtonsContainer.appendChild(button);
-  });
-
-  inputContainer.appendChild(inputGroup);
-  inputContainer.appendChild(quickButtonsContainer);
-
-  timeoutSection.appendChild(inputContainer);
-
-  // 도움말 텍스트
-  const helpText = document.createElement('div');
-  helpText.textContent = '일반적으로 5-30초(5000-30000 밀리초) 사이의 값을 권장합니다.';
-  helpText.style.fontSize = '12px';
-  helpText.style.color = '#64748b';
-  helpText.style.marginTop = '8px';
-  timeoutSection.appendChild(helpText);
-
-  leftSection.appendChild(timeoutSection);
 
   // 2. 오른쪽 영역 (결과 표시 영역)
   const rightSection = document.createElement('div');
@@ -1139,8 +1069,146 @@ export function createWaitOptionsContent({
   placeholderDesc.style.marginTop = '12px';
   placeholderContainer.appendChild(placeholderDesc);
 
-  // 오른쪽 섹션 UI 업데이트
-  updateRightSectionUI(rightSection, optionContext, currentTimeout, placeholderContainer, recorder.injectedScript, recorder);
+  // 사용자 정의 타임아웃 값 변경 핸들러
+  const handleTimeoutChange = (value: number) => {
+    // 내부 상태 업데이트
+    activeTimeout = value;
+
+    // 입력 필드 값 업데이트
+    timeoutInput.value = String(value);
+
+    // 부모로 값 전달
+    if (typeof onTimeoutChange === 'function')
+      onTimeoutChange(value);
+
+
+    // optionContext 업데이트
+    if (optionContext.value)
+      optionContext.value.currentTimeout = value;
+
+
+    // 현재 옵션이 있으면 UI 업데이트
+    if (optionContext.value && optionContext.value.waitState) {
+      updateRightSectionUI(
+          rightSection,
+          optionContext,
+          value,
+          placeholderContainer,
+          recorder.injectedScript,
+          recorder
+      );
+    }
+  };
+
+  // 타임아웃 입력 이벤트 핸들러
+  timeoutInput.addEventListener('input', e => {
+    const value = parseInt((e.target as HTMLInputElement).value, 10);
+    if (!isNaN(value) && value > 0)
+      handleTimeoutChange(value);
+
+  });
+
+  inputGroup.appendChild(timeoutInput);
+
+  // 빠른 시간 선택 버튼들
+  const quickTimeButtons = [
+    { value: 1000, label: '1초' },
+    { value: 3000, label: '3초' },
+    { value: 5000, label: '5초' },
+    { value: 10000, label: '10초' }
+  ];
+
+  const quickButtonsContainer = document.createElement('div');
+  quickButtonsContainer.style.display = 'flex';
+  quickButtonsContainer.style.marginTop = '8px';
+  quickButtonsContainer.style.gap = '8px';
+
+  quickTimeButtons.forEach(btn => {
+    const button = document.createElement('button');
+    button.textContent = btn.label;
+    button.style.padding = '6px 10px';
+    button.style.fontSize = '12px';
+    button.style.borderRadius = '4px';
+    button.style.border = '1px solid #d1d5db';
+    button.style.backgroundColor = activeTimeout === btn.value ? '#e0edff' : '#f9fafb';
+    button.style.color = activeTimeout === btn.value ? '#2563eb' : '#4b5563';
+    button.style.cursor = 'pointer';
+    button.style.transition = 'all 0.2s ease';
+    button.style.fontWeight = activeTimeout === btn.value ? '500' : 'normal';
+
+    button.addEventListener('mouseover', () => {
+      if (activeTimeout !== btn.value)
+        button.style.backgroundColor = '#f3f4f6';
+    });
+
+    button.addEventListener('mouseout', () => {
+      if (activeTimeout !== btn.value)
+        button.style.backgroundColor = '#f9fafb';
+    });
+
+    button.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // 모든 버튼 스타일 초기화
+      quickButtonsContainer.querySelectorAll('button').forEach(b => {
+        const btnEl = b as HTMLElement;
+        btnEl.style.backgroundColor = '#f9fafb';
+        btnEl.style.color = '#4b5563';
+        btnEl.style.fontWeight = 'normal';
+      });
+
+      // 선택된 버튼 강조
+      button.style.backgroundColor = '#e0edff';
+      button.style.color = '#2563eb';
+      button.style.fontWeight = '500';
+
+      // 타임아웃 값 변경 처리
+      handleTimeoutChange(btn.value);
+    });
+
+    quickButtonsContainer.appendChild(button);
+  });
+
+  inputContainer.appendChild(inputGroup);
+  inputContainer.appendChild(quickButtonsContainer);
+
+  timeoutSection.appendChild(inputContainer);
+
+  // 도움말 텍스트
+  const helpText = document.createElement('div');
+  helpText.textContent = '일반적으로 5-30초(5000-30000 밀리초) 사이의 값을 권장합니다.';
+  helpText.style.fontSize = '12px';
+  helpText.style.color = '#64748b';
+  helpText.style.marginTop = '8px';
+  timeoutSection.appendChild(helpText);
+
+  leftSection.appendChild(timeoutSection);
+
+  // optionContext 초기화 또는 업데이트
+  if (currentWaitState) {
+    optionContext.set({
+      recorder,
+      container: rightSection,
+      waitState: currentWaitState,
+      currentTimeout: activeTimeout,
+      onTimeoutChange: handleTimeoutChange,
+      onWaitStateChange,
+    });
+
+    // 초기 UI 업데이트
+    updateRightSectionUI(
+        rightSection,
+        optionContext,
+        activeTimeout,
+        placeholderContainer,
+        recorder.injectedScript,
+        recorder
+    );
+  } else {
+    // 안내 메시지 표시
+    rightSection.appendChild(placeholderContainer);
+  }
 
   // 컨테이너에 좌우 섹션 추가
   content.appendChild(leftSection);
@@ -1165,27 +1233,30 @@ export function createWaitOptionsContent({
     highlightSelectedCard(optionCard as HTMLElement);
 
     // 상태 변경 콜백 호출
-    onWaitStateChange(waitStateId);
+    if (typeof onWaitStateChange === 'function')
+      onWaitStateChange(waitStateId);
 
 
     // 오른쪽 섹션 초기화
     rightSection.innerHTML = '';
 
+    // optionContext 업데이트
     optionContext.set({
       recorder,
       container: rightSection,
       waitState: waitStateId,
-      currentTimeout,
-      onTimeoutChange,
+      currentTimeout: activeTimeout,
+      onTimeoutChange: handleTimeoutChange,
+      onWaitStateChange,
     });
 
     // 상세 옵션 컨텐츠
     testFn({
       recorder,
-      container: rightSection, // 오른쪽 섹션에 결과 표시
+      container: rightSection,
       waitState: waitStateId,
-      currentTimeout,
-      onTimeoutChange,
+      currentTimeout: activeTimeout,
+      onTimeoutChange: handleTimeoutChange,
     });
   });
 
