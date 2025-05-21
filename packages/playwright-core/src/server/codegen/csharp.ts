@@ -162,6 +162,16 @@ export class CSharpLanguageGenerator implements LanguageGenerator {
           return `await ${subject}.WaitForTimeoutAsync(${timeout});`;
         return `await ${subject}.WaitForTimeoutAsync(${quote(timeout)});`;
       }
+      case 'waitForNavigation': {
+        const options = action.options || {};
+        const optionsString = formatObject(options, '    ', 'NavigationOptions');
+        return `await ${subject}.WaitForNavigationAsync(${optionsString});`;
+      }
+      case 'waitForLoadState': {
+        const options = action.options || {};
+        const optionsString = formatObject(options, '    ', 'LoadStateOptions');
+        return `await ${subject}.WaitForLoadStateAsync(${optionsString});`;
+      }
     }
 
     return `// 알 수 없는 액션: ${action.name}`;
