@@ -133,6 +133,16 @@ export class JavaScriptLanguageGenerator implements LanguageGenerator {
           return `await ${subject}.waitForTimeout(${timeout});`;
         return `await ${subject}.waitForTimeout(${quote(timeout)});`;
       }
+      case 'waitForLoadState': {
+        const options = action.options || {};
+        const optionsString = formatOptions(options, false);
+        return `await ${subject}.waitForLoadState(${optionsString});`;
+      }
+      case 'waitForNavigation': {
+        const options = action.options || {};
+        const optionsString = formatOptions(options, false);
+        return `await ${subject}.waitForNavigation(${optionsString});`;
+      }
     }
     return `// 알 수 없는 액션: ${action.name}`;
   }

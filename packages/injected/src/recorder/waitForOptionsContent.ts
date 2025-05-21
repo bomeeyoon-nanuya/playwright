@@ -362,6 +362,10 @@ interface OptionContextValue {
   onTimeoutChange?: (timeout: number) => void;
   onWaitStateChange?: (state: WaitState) => void;
   selector?: string;
+  url?: string;
+  onUrlChange?: (url: string) => void;
+  waitUntil?: string;
+  onWaitUntilChange?: (waitUntil: string) => void;
 }
 
 /**
@@ -493,14 +497,18 @@ const CODE_DISPLAY_STYLE = {
 /**
  * 선택된 셀렉터로 테스트 코드를 생성하는 순수 함수
  */
-const generateTestCode = (selector: string, timeout: number, waitState: WaitState): string => {
+const generateTestCode = (selector: string, timeout: number, waitState: WaitState, waitUntil: string = 'networkidle'): string => {
   switch (waitState) {
     case WAIT_STATE.ELEMENT:
       return `await page.waitForSelector('${selector}', { state: 'visible', timeout: ${timeout} });`;
     case WAIT_STATE.REMOVED:
       return `await page.waitForSelector('${selector}', { state: 'hidden', timeout: ${timeout} });`;
     case WAIT_STATE.NAVIGATION:
-      return `await page.waitForNavigation({ waitUntil: 'load', timeout: ${timeout} });`;
+      if (selector && selector.trim() !== '')
+        return `await page.waitForNavigation({ url: '${selector}', waitUntil: '${waitUntil}', timeout: ${timeout} });`;
+      else
+        return `await page.waitForNavigation({ waitUntil: '${waitUntil}', timeout: ${timeout} });`;
+
     case WAIT_STATE.NETWORK:
       return `await page.waitForResponse(response => response.url().includes('/api'), { timeout: ${timeout} });`;
     case WAIT_STATE.TIMEOUT:
@@ -594,7 +602,7 @@ const createCodeBlock = (testCode: string, injectedScript: InjectedScript, waitS
 /**
  * 레코더에 대기 동작 기록하는 함수
  */
-const recordWaitAction = (recorder: Recorder, waitState: WaitState, selector: string, timeout: number): void => {
+const recordWaitAction = (recorder: Recorder, waitState: WaitState, selector: string, timeout: number, waitUntil: string = 'networkidle'): void => {
   if (!recorder)
     return;
 
@@ -630,10 +638,15 @@ const recordWaitAction = (recorder: Recorder, waitState: WaitState, selector: st
           name: 'waitForNavigation',
           options: {
             timeout,
-            waitUntil: 'load'
+            waitUntil
           },
           signals: []
         };
+
+        // URL이 지정된 경우에만 추가
+        if (selector && selector.trim() !== '')
+          action.options.url = selector; // options 내부로 url 이동
+
         break;
       case WAIT_STATE.NETWORK:
         action = {
@@ -734,7 +747,7 @@ const createUseButton = (
       useButton.style.backgroundColor = STYLES.SUCCESS_BUTTON.backgroundColor;
 
       // 통일된 함수 사용
-      recordWaitAction(recorder, waitState, selector, timeout);
+      recordWaitAction(recorder, waitState, selector, timeout, optionContext.value?.waitUntil || 'networkidle');
 
       // 버튼 상태 복구
       setTimeout(() => {
@@ -763,7 +776,7 @@ const createSelectedElementResult = (
   const resultDiv = injectedScript.document.createElement('div');
   applyStyles(resultDiv, STYLES.RESULT_CONTAINER);
 
-  const testCode = generateTestCode(selector, timeout, waitState);
+  const testCode = generateTestCode(selector, timeout, waitState, optionContext.value?.waitUntil || 'networkidle');
 
   resultDiv.appendChild(createSuccessHeader(injectedScript, waitState));
   resultDiv.appendChild(createSelectorDisplay(selector, injectedScript));
@@ -813,6 +826,10 @@ const updateRightSectionUI = (
       waitState,
       currentTimeout,
       onTimeoutChange: optionContext.value.onTimeoutChange,
+      url: optionContext.value.url,
+      onUrlChange: optionContext.value.onUrlChange,
+      waitUntil: optionContext.value.waitUntil || 'networkidle',
+      onWaitUntilChange: optionContext.value.onWaitUntilChange
     });
   } else {
     // 안내 메시지 표시
@@ -850,6 +867,8 @@ export function createWaitOptionsContent({
 
   // 현재 타임아웃 값 관리를 위한 상태 변수
   let activeTimeout = currentTimeout;
+  let activeUrl = ''; // URL 입력 값 관리를 위한 변수
+  let activeWaitUntil = 'networkidle'; // waitUntil 옵션 관리를 위한 변수
 
   // 1. 왼쪽 영역 (옵션 선택 영역)
   const leftSection = document.createElement('div');
@@ -1194,6 +1213,14 @@ export function createWaitOptionsContent({
       currentTimeout: activeTimeout,
       onTimeoutChange: handleTimeoutChange,
       onWaitStateChange,
+      url: activeUrl,
+      onUrlChange: (url: string) => {
+        activeUrl = url;
+      },
+      waitUntil: activeWaitUntil,
+      onWaitUntilChange: (waitUntil: string) => {
+        activeWaitUntil = waitUntil;
+      }
     });
 
     // 초기 UI 업데이트
@@ -1248,6 +1275,14 @@ export function createWaitOptionsContent({
       currentTimeout: activeTimeout,
       onTimeoutChange: handleTimeoutChange,
       onWaitStateChange,
+      url: activeUrl,
+      onUrlChange: (url: string) => {
+        activeUrl = url;
+      },
+      waitUntil: activeWaitUntil,
+      onWaitUntilChange: (waitUntil: string) => {
+        activeWaitUntil = waitUntil;
+      }
     });
 
     // 상세 옵션 컨텐츠
@@ -1257,6 +1292,14 @@ export function createWaitOptionsContent({
       waitState: waitStateId,
       currentTimeout: activeTimeout,
       onTimeoutChange: handleTimeoutChange,
+      url: activeUrl,
+      onUrlChange: (url: string) => {
+        activeUrl = url;
+      },
+      waitUntil: activeWaitUntil,
+      onWaitUntilChange: (waitUntil: string) => {
+        activeWaitUntil = waitUntil;
+      }
     });
   });
 
@@ -1272,6 +1315,10 @@ function testFn(options: {
   waitState: WaitState;
   currentTimeout?: number;
   onTimeoutChange?: (timeout: number) => void;
+  url?: string;
+  onUrlChange?: (url: string) => void;
+  waitUntil?: string;
+  onWaitUntilChange?: (waitUntil: string) => void;
 }) {
   // 컨테이너를 초기화하여 이전 내용 제거
   options.container.innerHTML = '';
@@ -1330,15 +1377,187 @@ function testFn(options: {
       navigationContent.style.borderRadius = '8px';
       navigationContent.style.border = '1px solid #bae6fd';
 
-      const navCode = generateTestCode('', options.currentTimeout || 5000, WAIT_STATE.NAVIGATION);
+      // 현재 URL 가져오기 - 기본값으로 사용
+      const currentUrl = options.url || _injectedRecorder.injectedScript.window.location.href;
 
-      navigationContent.innerHTML = `
-        <h3 style="margin-top: 0; font-size: 16px; color: #0c4a6e;">페이지 이동 대기</h3>
-        <p style="margin-bottom: 16px; font-size: 14px; color: #334155;">
-          페이지 이동이 완료될 때까지 대기합니다.
-        </p>
-        <pre style="background-color: ${CODE_DISPLAY_STYLE.backgroundColor}; color: ${CODE_DISPLAY_STYLE.color}; padding: ${CODE_DISPLAY_STYLE.padding}; border-radius: ${CODE_DISPLAY_STYLE.borderRadius}; overflow-x: ${CODE_DISPLAY_STYLE.overflowX}; white-space: ${CODE_DISPLAY_STYLE.whiteSpace};">${navCode}</pre>
-      `;
+      // URL 입력 영역 추가
+      const urlInputContainer = doc.createElement('div');
+      urlInputContainer.style.marginBottom = '16px';
+
+      const urlLabel = doc.createElement('label');
+      urlLabel.textContent = 'URL 패턴 (선택사항)';
+      urlLabel.style.display = 'block';
+      urlLabel.style.fontSize = '14px';
+      urlLabel.style.fontWeight = '500';
+      urlLabel.style.color = '#334155';
+      urlLabel.style.marginBottom = '8px';
+      urlInputContainer.appendChild(urlLabel);
+
+      const urlInput = doc.createElement('input');
+      urlInput.type = 'text';
+      urlInput.value = currentUrl;
+      urlInput.placeholder = '예: https://example.com/ 또는 */example*';
+      urlInput.style.width = '100%';
+      urlInput.style.padding = '10px 12px';
+      urlInput.style.borderRadius = '6px';
+      urlInput.style.border = '1px solid #d1d5db';
+      urlInput.style.fontSize = '14px';
+      urlInput.style.backgroundColor = '#ffffff';
+      urlInput.style.outline = 'none';
+      urlInput.style.transition = 'border-color 0.2s ease';
+      urlInputContainer.appendChild(urlInput);
+
+      // URL 정보 텍스트 추가
+      const urlInfo = doc.createElement('p');
+      urlInfo.textContent = 'URL을 정확히 입력하거나 와일드카드(*)를 사용할 수 있습니다.';
+      urlInfo.style.fontSize = '12px';
+      urlInfo.style.color = '#6b7280';
+      urlInfo.style.marginTop = '4px';
+      urlInputContainer.appendChild(urlInfo);
+
+      // waitUntil 선택 영역 추가
+      const waitUntilContainer = doc.createElement('div');
+      waitUntilContainer.style.marginBottom = '16px';
+
+      const waitUntilLabel = doc.createElement('label');
+      waitUntilLabel.textContent = '로드 완료 조건';
+      waitUntilLabel.style.display = 'block';
+      waitUntilLabel.style.fontSize = '14px';
+      waitUntilLabel.style.fontWeight = '500';
+      waitUntilLabel.style.color = '#334155';
+      waitUntilLabel.style.marginBottom = '8px';
+      waitUntilContainer.appendChild(waitUntilLabel);
+
+      // 드롭다운 생성
+      const waitUntilSelect = doc.createElement('select');
+      waitUntilSelect.style.width = '100%';
+      waitUntilSelect.style.padding = '10px 12px';
+      waitUntilSelect.style.borderRadius = '6px';
+      waitUntilSelect.style.border = '1px solid #d1d5db';
+      waitUntilSelect.style.fontSize = '14px';
+      waitUntilSelect.style.backgroundColor = '#ffffff';
+      waitUntilSelect.style.outline = 'none';
+      waitUntilSelect.style.transition = 'border-color 0.2s ease';
+      waitUntilSelect.style.appearance = 'auto';
+
+      // waitUntil 옵션 정의
+      const waitUntilOptions = [
+        { value: 'networkidle', label: 'networkidle - 네트워크 요청이 없는 상태' },
+        { value: 'commit', label: 'commit - 모든 네트워크 요청이 완료된 후' },
+        { value: 'load', label: 'load - 페이지 로드 완료' },
+        { value: 'domcontentloaded', label: 'domcontentloaded - DOM 로드 완료' },
+      ];
+
+      // 옵션 추가
+      waitUntilOptions.forEach(option => {
+        const optionElement = doc.createElement('option');
+        optionElement.value = option.value;
+        optionElement.textContent = option.label;
+
+        // 기본값 선택
+        if (options.waitUntil === option.value || (!options.waitUntil && option.value === 'networkidle'))
+          optionElement.selected = true;
+
+
+        waitUntilSelect.appendChild(optionElement);
+      });
+
+      // 이벤트 리스너 추가
+      waitUntilSelect.addEventListener('change', () => {
+        if (options.onWaitUntilChange)
+          options.onWaitUntilChange(waitUntilSelect.value);
+
+
+        // optionContext 업데이트
+        if (optionContext.value)
+          optionContext.value.waitUntil = waitUntilSelect.value;
+
+
+        // 코드 예시 업데이트
+        const updatedCode = generateTestCode(
+            urlInput.value,
+            options.currentTimeout || 5000,
+            WAIT_STATE.NAVIGATION,
+            waitUntilSelect.value
+        );
+        codeExample.textContent = updatedCode;
+      });
+
+      waitUntilContainer.appendChild(waitUntilSelect);
+
+      // waitUntil 설명 추가
+      const waitUntilInfo = doc.createElement('p');
+      waitUntilInfo.textContent = '페이지 이동이 완료되었다고 간주할 조건을 선택합니다.';
+      waitUntilInfo.style.fontSize = '12px';
+      waitUntilInfo.style.color = '#6b7280';
+      waitUntilInfo.style.marginTop = '4px';
+      waitUntilContainer.appendChild(waitUntilInfo);
+
+      // URL 입력 이벤트 핸들러
+      urlInput.addEventListener('input', () => {
+        if (options.onUrlChange)
+          options.onUrlChange(urlInput.value);
+
+
+        // optionContext 업데이트
+        if (optionContext.value)
+          optionContext.value.url = urlInput.value;
+
+
+        // 코드 예시 업데이트
+        const updatedCode = generateTestCode(
+            urlInput.value,
+            options.currentTimeout || 5000,
+            WAIT_STATE.NAVIGATION,
+            waitUntilSelect.value
+        );
+        codeExample.textContent = updatedCode;
+      });
+
+      // 컨텐츠에 URL 입력 추가
+      navigationContent.appendChild(urlInputContainer);
+
+      // 컨텐츠에 waitUntil 선택 추가
+      navigationContent.appendChild(waitUntilContainer);
+
+      // 헤더 및 설명 추가
+      const navHeader = doc.createElement('h3');
+      navHeader.style.margin = '0 0 12px 0';
+      navHeader.style.fontSize = '16px';
+      navHeader.style.color = '#0c4a6e';
+      navHeader.textContent = '페이지 이동 대기';
+      navigationContent.appendChild(navHeader);
+
+      const navDesc = doc.createElement('p');
+      navDesc.style.marginBottom = '16px';
+      navDesc.style.fontSize = '14px';
+      navDesc.style.color = '#334155';
+      navDesc.textContent = '지정된 URL 패턴과 일치하는 페이지 이동이 완료될 때까지 대기합니다.';
+      navigationContent.appendChild(navDesc);
+
+      // 코드 예시 추가
+      const navCode = generateTestCode(
+          currentUrl,
+          options.currentTimeout || 5000,
+          WAIT_STATE.NAVIGATION,
+          options.waitUntil || 'networkidle'
+      );
+
+      // 코드 컨테이너 추가
+      const codeContainer = doc.createElement('div');
+      codeContainer.style.marginBottom = '16px';
+
+      const codeExample = doc.createElement('pre');
+      codeExample.style.backgroundColor = CODE_DISPLAY_STYLE.backgroundColor;
+      codeExample.style.color = CODE_DISPLAY_STYLE.color;
+      codeExample.style.padding = CODE_DISPLAY_STYLE.padding;
+      codeExample.style.borderRadius = CODE_DISPLAY_STYLE.borderRadius;
+      codeExample.style.overflowX = CODE_DISPLAY_STYLE.overflowX;
+      codeExample.style.whiteSpace = CODE_DISPLAY_STYLE.whiteSpace;
+      codeExample.textContent = navCode;
+
+      codeContainer.appendChild(codeExample);
+      navigationContent.appendChild(codeContainer);
 
       // 사용하기 버튼 추가
       const navBtnContainer = doc.createElement('div');
@@ -1360,12 +1579,13 @@ function testFn(options: {
 
       navBtn.addEventListener('click', () => {
         try {
-          // recordWaitAction 함수 사용 - 옵션 전달
+          // recordWaitAction 함수 사용 - URL 값과 waitUntil 값 전달
           recordWaitAction(
               _injectedRecorder,
               WAIT_STATE.NAVIGATION,
-              '',
-              options.currentTimeout || 5000
+              urlInput.value,
+              options.currentTimeout || 5000,
+              waitUntilSelect.value
           );
 
           // 버튼 상태 변경
