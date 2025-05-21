@@ -1377,6 +1377,21 @@ function testFn(options: {
       navigationContent.style.borderRadius = '8px';
       navigationContent.style.border = '1px solid #bae6fd';
 
+      // 헤더 및 설명 추가
+      const navHeader = doc.createElement('h3');
+      navHeader.style.margin = '0 0 12px 0';
+      navHeader.style.fontSize = '16px';
+      navHeader.style.color = '#0c4a6e';
+      navHeader.textContent = '페이지 이동 대기';
+      navigationContent.appendChild(navHeader);
+
+      const navDesc = doc.createElement('p');
+      navDesc.style.marginBottom = '16px';
+      navDesc.style.fontSize = '14px';
+      navDesc.style.color = '#334155';
+      navDesc.textContent = '지정된 URL 패턴과 일치하는 페이지 이동이 완료될 때까지 대기합니다.';
+      navigationContent.appendChild(navDesc);
+
       // 현재 URL 가져오기 - 기본값으로 사용
       const currentUrl = options.url || _injectedRecorder.injectedScript.window.location.href;
 
@@ -1519,21 +1534,6 @@ function testFn(options: {
 
       // 컨텐츠에 waitUntil 선택 추가
       navigationContent.appendChild(waitUntilContainer);
-
-      // 헤더 및 설명 추가
-      const navHeader = doc.createElement('h3');
-      navHeader.style.margin = '0 0 12px 0';
-      navHeader.style.fontSize = '16px';
-      navHeader.style.color = '#0c4a6e';
-      navHeader.textContent = '페이지 이동 대기';
-      navigationContent.appendChild(navHeader);
-
-      const navDesc = doc.createElement('p');
-      navDesc.style.marginBottom = '16px';
-      navDesc.style.fontSize = '14px';
-      navDesc.style.color = '#334155';
-      navDesc.textContent = '지정된 URL 패턴과 일치하는 페이지 이동이 완료될 때까지 대기합니다.';
-      navigationContent.appendChild(navDesc);
 
       // 코드 예시 추가
       const navCode = generateTestCode(
