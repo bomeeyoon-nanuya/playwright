@@ -15,5 +15,29 @@
  * limitations under the License.
  */
 
+// 브라우저가 설치되어 있지 않을 때 자동으로 설치
+try {
+  const { existsSync } = require('fs');
+  const { execSync } = require('child_process');
+  const path = require('path');
+  const os = require('os');
+  
+  const browserDir = process.env.PLAYWRIGHT_BROWSERS_PATH || path.join(os.homedir(), 'Library', 'Caches', 'ms-playwright');
+  
+  // 하나라도 브라우저가 설치되어 있지 않으면 모든 브라우저 설치
+  const browsers = ['chromium', 'firefox', 'webkit'];
+  const isBrowsersInstalled = browsers.every(browser => {
+    const browserPattern = `${browser}-*`;
+    const browserPath = path.join(browserDir, browserPattern);
+    return existsSync(browserPath);
+  });
+  
+  if (!isBrowsersInstalled) {
+    execSync('npx @shopby/playwright-core install', { stdio: 'inherit' });
+  }
+} catch (e) {
+  console.error('브라우저 설치 확인 중 오류가 발생했습니다:', e);
+}
+
 const { program } = require('./lib/program');
 program.parse(process.argv);

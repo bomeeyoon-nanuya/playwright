@@ -14,4 +14,11 @@
  * limitations under the License.
  */
 
-export * from '@shopby/playwright-core';
+import { installBrowsersForNpmInstall } from '@shopby/playwright-core/lib/server/registry/index';
+
+try {
+  // npm이 설치 중인 경우 브라우저를 자동으로 설치합니다
+  installBrowsersForNpmInstall(['chromium', 'firefox', 'webkit']).catch(() => {});
+} catch (e) {
+  // 개발 환경에서는 무시합니다
+}

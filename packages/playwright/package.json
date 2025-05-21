@@ -1,6 +1,6 @@
 {
   "name": "@shopby/playwright",
-  "version": "1.0.3",
+  "version": "1.0.9",
   "description": "ShopBy의 Playwright 기반 테스트 라이브러리",
   "repository": {
     "type": "git",
@@ -51,12 +51,15 @@
   "bin": {
     "shopby-playwright": "cli.js"
   },
+  "scripts": {
+    "postinstall": "node -e \"try { require('@shopby/playwright-core/lib/server').installBrowsersForNpmInstall(['chromium', 'firefox', 'webkit']) } catch(e) { }\""
+  },
   "author": {
     "name": "ShopBy"
   },
   "license": "Apache-2.0",
   "dependencies": {
-    "@shopby/playwright-core": "1.0.2"
+    "@shopby/playwright-core": "1.0.5"
   },
   "optionalDependencies": {
     "fsevents": "2.3.2"

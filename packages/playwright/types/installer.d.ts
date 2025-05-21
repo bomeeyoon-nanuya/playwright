@@ -14,4 +14,6 @@
  * limitations under the License.
  */
 
-export * from '@shopby/playwright-core';
+declare module '@shopby/playwright-core/lib/server/registry/index' {
+  export function installBrowsersForNpmInstall(browsers: string[]): Promise<boolean>;
+} 
