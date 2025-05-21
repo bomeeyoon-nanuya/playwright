@@ -14,1791 +14,803 @@
  * limitations under the License.
  */
 
-// Recorder 타입을 사용하기 위한 import 추가
+import {
+  CONTAINER_STYLES,
+  SECTION_STYLES,
+  COMPONENT_STYLES
+} from './styles/waitForOptions.styles';
+import { WAIT_STATE, WAIT_UNTIL_OPTIONS } from './constants/waitForOptions.constants';
+import {
+  createLeftSection,
+  createRightSection,
+  createPlaceholderContainer,
+  createSelectedElementResult
+} from './components/waitForComponents';
+import { createElementWaitHandler, handleElementSelection } from './components/elementWaitComponent';
+import { applyStyles } from './utils/domUtils';
+import { recordWaitAction, generateTestCode } from './utils/waitForUtils';
+import { optionContext } from './state/optionContext';
+
+import type { CreateWaitOptionsContentParams, WaitState } from './types/waitForOptions.types';
 import type { Recorder } from './recorder';
-import type { InjectedScript } from '../injectedScript';
 
 /**
- * 지정한 태그명을 가진 부모 요소를 탐색하여 반환합니다.
- *
- * @param element 시작 요소
- * @param tagName 찾을 커스텀 태그 이름 (예: 'x-test-element')
- * @returns 가장 가까운 커스텀 태그 부모 또는 null
+ * 대기 옵션 UI 컨텐츠 생성
  */
-export const findParentByTagName = (element: Element | null, tagName: string): Element | null => {
-  let current = element?.parentElement;
-  const normalized = tagName.toUpperCase();
-  while (current) {
-    if (current.tagName === normalized)
-      return current;
+export function createWaitOptionsContent(params: CreateWaitOptionsContentParams): HTMLElement {
+  const { document, currentWaitState, currentTimeout: initialTimeout, onWaitStateChange, onTimeoutChange, recorder } = params;
 
-    current = current.parentElement;
-  }
-  return null;
-};
+  // 현재 타임아웃 값 (공통 상태)
+  let currentTimeout = initialTimeout;
 
-/**
- * 이 파일은 JSX 형태로 표현된 코드입니다.
- * 실제로는 TypeScript로 실행되며, JSX는 가독성을 위한 표현 방식입니다.
- */
-
-// WaitForTool에서 사용할 WAIT_STATE 타입
-export const WAIT_STATE = {
-  ELEMENT: 'element',
-  NAVIGATION: 'navigation',
-  NETWORK: 'network',
-  REMOVED: 'removed',
-  TIMEOUT: 'timeout',
-  PAGE_LOAD: 'pageLoad',
-} as const;
-
-// 페이지 로드 상태 옵션
-export const PAGE_LOAD_STATE = {
-  LOAD: 'load',
-  DOM_CONTENT_LOADED: 'domcontentloaded',
-  NETWORK_IDLE: 'networkidle',
-} as const;
-
-export type PageLoadState = typeof PAGE_LOAD_STATE[keyof typeof PAGE_LOAD_STATE];
-export type WaitState = typeof WAIT_STATE[keyof typeof WAIT_STATE];
-
-// 인터페이스 정의
-export interface WaitForOptions {
-  waitState: WaitState;
-  timeout: number;
-  selector?: string;
-  url?: string;
-  predicate?: string;
-}
-
-/**
- * 요소 선택 이벤트 핸들러 타입 정의
- */
-export interface ElementWaitOptions {
-  container: HTMLElement;
-  currentTimeout?: number;
-  onElementSelected?: (selector: string) => void;
-  recorder: Recorder; // Recorder 인스턴스가 필수
-}
-
-/**
- * WaitForTool에 있는 정적 플래그를 리셋합니다.
- * 해당 플래그는 모달 표시 시 체크되는 값입니다.
- */
-export function resetWaitForDialogState(injectedScript: InjectedScript) {
-  // 글로벌 플래그를 통해 WaitForTool._isAnyDialogShowing를 리셋합니다
-  (injectedScript.window as any).__pw_resetWaitDialogState = true;
-}
-
-/**
- * WaitForTool 인스턴스를 직접 통해 대화상자를 표시하는 함수
- */
-export function showWaitForDialog(recorder: Recorder) {
-  // 현재 WaitingFor 상태가 아닌 경우에만 모드 변경
-  if (recorder.state.mode !== 'waitingFor')
-    recorder.setMode('waitingFor');
-
-  // WaitForTool._isAnyDialogShowing 플래그 초기화
-  resetWaitForDialogState(recorder.injectedScript);
-
-  // 특수 방법으로 WaitForTool 인스턴스에 접근하여 showDialog 메서드 호출
-  setTimeout(() => {
-    // waitFor 툴바 버튼을 트리거하여 툴을 활성화
-    const waitForToggle = recorder.injectedScript.document.querySelector('x-pw-tool-item.wait-for');
-    if (waitForToggle && waitForToggle instanceof HTMLElement) {
-      // 한 번 클릭하여 waitingFor 모드로 들어가도록 함
-      waitForToggle.click();
-
-      // 모드 변경이 적용된 후 WaitForTool 인스턴스에 직접 명령을 전달
-      setTimeout(() => {
-        const waitForTool = getWaitForToolInstance(recorder);
-        if (waitForTool) {
-          // 모달 표시 메서드 호출
-          waitForTool.showDialog();
-        }
-      }, 100);
-    }
-  }, 0);
-}
-
-/**
- * Recorder 객체에서 WaitForTool 인스턴스에 접근하는 헬퍼 함수
- */
-function getWaitForToolInstance(recorder: Recorder): any {
-  // 모든 툴에 접근
-  const tools = (recorder as any)._tools;
-  if (tools && tools.waitingFor)
-    return tools.waitingFor;
-
-  return null;
-}
-
-/**
- * 요소 선택 후 처리를 담당하는 핸들러
- */
-export function handleElementWait(options: ElementWaitOptions): void {
-  const { container, recorder } = options;
-
-  if (!recorder) {
-    // 에러 대신 조용히 반환
-    return;
-  }
-
-  const injectedScript = recorder.injectedScript;
-  const root = container.getRootNode() as Document;
-  const picker = root.querySelector('.pick-locator') as HTMLButtonElement;
-
-  if (!picker)
-    return;
-
-  // 요소 선택 모드 설명 및 안내 표시
-  const instructionsContainer = injectedScript.document.createElement('div');
-  instructionsContainer.style.padding = '16px';
-  instructionsContainer.style.backgroundColor = '#fffbeb';
-  instructionsContainer.style.borderRadius = '8px';
-  instructionsContainer.style.border = '1px solid #fef3c7';
-  instructionsContainer.style.marginBottom = '16px';
-
-  instructionsContainer.innerHTML = `
-    <div style="display: flex; align-items: center; margin-bottom: 12px;">
-      <span style="font-size: 20px; margin-right: 8px;">🔍</span>
-      <span style="font-weight: 500; font-size: 15px; color: '#92400e';">요소 선택 모드</span>
-    </div>
-    <p style="margin: 0; font-size: 13px; color: '#92400e';">
-      페이지에서 대기할 요소를 클릭하세요.
-    </p>
-  `;
-
-  // 컨테이너 스타일링
-  container.style.padding = '0';
-  container.style.backgroundColor = '#f9fafb';
-  container.style.borderRadius = '8px';
-  container.style.border = '1px solid #e5e7eb';
-  container.style.display = 'flex';
-  container.style.flexDirection = 'column';
-  container.style.height = '100%';
-
-  // 기존 내용 제거 후 안내 메시지 표시
-  container.innerHTML = '';
-  container.appendChild(instructionsContainer);
-
-  // 요소 선택 모드 활성화
-  picker.click();
-
-  // 요소 선택 완료 시 전달받는 이벤트 추가
-  (injectedScript.window as any).__pw_recorderElementPicked = (elementInfo: { selector: string }) => {
-    try {
-      // 선택된 셀렉터 저장
-      const selectedSelector = elementInfo.selector;
-
-      // 글로벌 핸들러 제거
-      delete (injectedScript.window as any).__pw_recorderElementPicked;
-
-      // 가장 중요한 부분: 선택된 셀렉터를 즉시 콜백을 통해 전달
-      if (options.onElementSelected)
-        options.onElementSelected(selectedSelector);
-
-
-      // 약간의 지연 후 모달 표시 (onElementSelected가 optionContext를 업데이트한 후)
-      setTimeout(() => {
-        showWaitForDialog(recorder);
-      }, 100);
-    } catch (err) {
-      // 오류 발생 시 조용히 처리
-    }
+  // 코드 블록 요소 참조 저장 (각 유형별로 생성될 코드 블록 엘리먼트)
+  const codeBlockElements: Record<WaitState, HTMLPreElement | null> = {
+    element: null,
+    removed: null,
+    navigation: null,
+    network: null,
+    timeout: null,
+    pageLoad: null
   };
-}
 
-/**
- * 대기 옵션들 정의
- */
-const waitOptions = [
-  {
-    id: WAIT_STATE.ELEMENT,
-    label: '요소 표시 대기',
-    description: '특정 요소가 화면에 표시될 때까지 대기',
-    icon: '🔍'
-  },
-  {
-    id: WAIT_STATE.REMOVED,
-    label: '요소 제거 대기',
-    description: '특정 요소가 화면에서 사라질 때까지 대기',
-    icon: '🗑️'
-  },
-  {
-    id: WAIT_STATE.NAVIGATION,
-    label: '페이지 이동 대기',
-    description: '페이지 이동이 완료될 때까지 대기',
-    icon: '🌐'
-  },
-  {
-    id: WAIT_STATE.NETWORK,
-    label: 'API 요청 대기',
-    description: '네트워크 응답이 완료될 때까지 대기',
-    icon: '📡'
-  },
-  {
-    id: WAIT_STATE.TIMEOUT,
-    label: '시간 지연 대기',
-    description: '지정된 시간(밀리초)만큼 대기',
-    icon: '⏱️'
-  },
-  {
-    id: WAIT_STATE.PAGE_LOAD,
-    label: '페이지 로드 대기',
-    description: '페이지 로드 상태(load)까지 대기',
-    icon: '📄'
-  }
-];
+  // 선택된 셀렉터 저장 (요소 대기 관련)
+  let selectedElementSelector: string | null = null;
+  let selectedRemovedSelector: string | null = null;
 
-/**
- * 헬퍼 함수: 클릭된 요소에서 가장 가까운 선택자에 해당하는 부모 요소 찾기
- */
-function findClosestElement(element: HTMLElement, selector: string): HTMLElement | null {
-  if (element.matches(selector))
-    return element;
+  // URL 패턴, waitUntil 값 저장 (네비게이션 대기 관련)
+  let navigationUrl = recorder.injectedScript.window.location.href;
+  let navigationWaitUntil = 'networkidle';
 
-  let parent = element.parentElement;
-  while (parent) {
-    if (parent.matches(selector))
-      return parent;
-    parent = parent.parentElement;
-  }
+  // API 요청 URL 패턴 저장 (네트워크 대기 관련)
+  let networkUrlPattern = '/api';
 
-  return null;
-}
+  // 현재 선택된 대기 상태
+  let activeWaitState = currentWaitState;
 
-/**
- * 헬퍼 함수: 모든 옵션 카드 스타일 초기화
- */
-function resetAllOptionCards(optionsSection: HTMLElement) {
-  optionsSection.querySelectorAll('.wait-option-card').forEach(card => {
-    const c = card as HTMLElement;
-    c.style.backgroundColor = '#ffffff';
-    c.style.borderColor = '#e5e7eb';
-    c.style.boxShadow = 'none';
+  // 메인 컨테이너 생성
+  const container = document.createElement('div');
+  applyStyles(container, CONTAINER_STYLES.MAIN);
 
-    // 아이콘 초기화
-    const iconEl = c.querySelector('.wait-option-icon') as HTMLElement;
-    if (iconEl) {
-      iconEl.style.backgroundColor = '#f9fafb';
-      iconEl.style.color = '#6b7280';
-    }
+  // 컨텍스트 설정
+  optionContext.set({
+    recorder,
+    waitState: currentWaitState || undefined,
+    currentTimeout,
+    // 중요: 이 핸들러는 왼쪽 "대기 시간 설정" 섹션에서 시간 변경 시 호출됨
+    onTimeoutChange: newTimeout => {
+      // 타임아웃 값 업데이트
+      currentTimeout = newTimeout;
 
-    // 텍스트 초기화
-    const labelEl = c.querySelector('.wait-option-label') as HTMLElement;
-    if (labelEl)
-      labelEl.style.color = '#374151';
+      // 옵션 컨텍스트의 currentTimeout 값도 업데이트
+      if (optionContext.value)
+        optionContext.value.currentTimeout = newTimeout;
 
-    const descEl = c.querySelector('.wait-option-desc') as HTMLElement;
-    if (descEl)
-      descEl.style.color = '#6b7280';
+      // 상위 컴포넌트에 알림
+      onTimeoutChange(newTimeout);
 
-    // 라디오 버튼 초기화
-    const radioEl = c.querySelector('.wait-option-radio') as HTMLElement;
-    if (radioEl) {
-      radioEl.style.border = '2px solid #d1d5db';
-      // 내부 점만 제거하고 라디오 버튼 자체는 유지
-      const dot = radioEl.querySelector('.wait-option-radio-dot');
-      if (dot)
-        dot.remove();
-    }
+      // 현재 활성화된 대기 상태에 따라 코드 블록 업데이트
+      updateCodeBlockForCurrentState(newTimeout);
+    },
+    onWaitStateChange
   });
-}
 
-/**
- * 헬퍼 함수: 선택된 카드 강조
- */
-function highlightSelectedCard(optionCard: HTMLElement) {
-  // 선택된 옵션 강조
-  optionCard.style.backgroundColor = '#f0f7ff';
-  optionCard.style.borderColor = '#3b82f6';
-  optionCard.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+  // 현재 대기 상태에 맞는 코드 블록 업데이트 함수
+  function updateCodeBlockForCurrentState(timeout: number): void {
+    // 활성화된 대기 상태가 없으면 반환
+    if (!activeWaitState)
+      return;
 
-  // 아이콘 컨테이너 강조
-  const iconEl = optionCard.querySelector('.wait-option-icon') as HTMLElement;
-  if (iconEl) {
-    iconEl.style.backgroundColor = '#e0edff';
-    iconEl.style.color = '#2563eb';
-  }
+    // 현재 활성화된 대기 상태에 해당하는 코드 블록 요소
+    const codeBlock = codeBlockElements[activeWaitState];
+    if (!codeBlock)
+      return;
 
-  // 라벨 강조
-  const labelEl = optionCard.querySelector('.wait-option-label') as HTMLElement;
-  if (labelEl)
-    labelEl.style.color = '#1f2937';
+    // 선택된 대기 유형에 따라 적절한 코드 생성
+    let code = '';
 
-  // 설명 강조
-  const descEl = optionCard.querySelector('.wait-option-desc') as HTMLElement;
-  if (descEl)
-    descEl.style.color = '#4b5563';
+    switch (activeWaitState) {
+      case WAIT_STATE.ELEMENT:
+        if (selectedElementSelector)
+          code = generateTestCode(selectedElementSelector, timeout, WAIT_STATE.ELEMENT);
 
-  // 라디오 버튼 강조
-  const radioEl = optionCard.querySelector('.wait-option-radio') as HTMLElement;
-  if (radioEl) {
-    radioEl.style.border = '2px solid #3b82f6';
+        break;
 
-    // 내부 점 추가 (이미 있는 경우는 그대로 둠)
-    if (!radioEl.querySelector('.wait-option-radio-dot')) {
-      // InjectedScript.document를 바로 사용할 수 없으므로 optionCard가 속한 document 객체 사용
-      const innerDot = optionCard.ownerDocument.createElement('div');
-      innerDot.classList.add('wait-option-radio-dot');
-      innerDot.style.width = '10px';
-      innerDot.style.height = '10px';
-      innerDot.style.borderRadius = '50%';
-      innerDot.style.backgroundColor = '#3b82f6';
-      radioEl.appendChild(innerDot);
+      case WAIT_STATE.REMOVED:
+        if (selectedRemovedSelector)
+          code = generateTestCode(selectedRemovedSelector, timeout, WAIT_STATE.REMOVED);
+
+        break;
+
+      case WAIT_STATE.NAVIGATION:
+        code = generateTestCode(navigationUrl, timeout, WAIT_STATE.NAVIGATION, navigationWaitUntil);
+        break;
+
+      case WAIT_STATE.NETWORK:
+        code = `await page.waitForResponse(response => response.url().includes('${networkUrlPattern}'), { timeout: ${timeout} });`;
+        break;
+
+      case WAIT_STATE.TIMEOUT:
+        code = `await page.waitForTimeout(${timeout});`;
+        break;
+
+      case WAIT_STATE.PAGE_LOAD:
+        code = `await page.waitForLoadState('load', { timeout: ${timeout} });`;
+        break;
     }
+
+    // 코드가 생성되었으면 코드 블록 업데이트
+    if (code)
+      codeBlock.textContent = code;
+
   }
-}
 
-/**
- * 옵션 컨텍스트의 값 타입 정의
- */
-interface OptionContextValue {
-  recorder?: Recorder;
-  container?: HTMLElement;
-  waitState?: WaitState;
-  currentTimeout?: number;
-  onTimeoutChange?: (timeout: number) => void;
-  onWaitStateChange?: (state: WaitState) => void;
-  selector?: string;
-  url?: string;
-  onUrlChange?: (url: string) => void;
-  waitUntil?: string;
-  onWaitUntilChange?: (waitUntil: string) => void;
-}
-
-/**
- * 옵션 컨텍스트 인터페이스 정의
- */
-interface OptionContext {
-  value: OptionContextValue | null;
-  set: (value: OptionContextValue) => void;
-  get: () => OptionContextValue | null;
-  clear: () => void;
-}
-
-const optionContext: OptionContext = {
-  value: null,
-  set: value => {
-    optionContext.value = value;
-  },
-  get: () => {
-    return optionContext.value;
-  },
-  clear: () => {
-    optionContext.value = null;
-  },
-};
-
-/**
- * 상수 정의
- */
-const STYLES = {
-  RESULT_CONTAINER: {
-    padding: '16px',
-    backgroundColor: '#f0f9ff',
-    borderRadius: '8px',
-    border: '1px solid #bae6fd',
-    margin: '16px'
-  },
-  SUCCESS_ICON: {
-    fontSize: '20px',
-    marginRight: '8px'
-  },
-  SUCCESS_TEXT: {
-    fontWeight: '500',
-    fontSize: '15px',
-    color: '#0c4a6e'
-  },
-  SELECTOR_CONTAINER: {
-    fontFamily: 'monospace',
-    background: '#fff',
-    padding: '8px',
-    borderRadius: '4px',
-    marginBottom: '12px',
-    wordBreak: 'break-all'
-  },
-  CODE_HEADING: {
-    fontSize: '15px',
-    fontWeight: '500',
-    marginTop: '16px',
-    marginBottom: '8px'
-  },
-  CODE_BLOCK: {
-    background: '#1e293b',
-    color: '#e2e8f0',
-    padding: '12px',
-    borderRadius: '6px',
-    overflow: 'auto',
-    margin: '0'
-  },
-  CODE_DESCRIPTION: {
-    fontSize: '12px',
-    color: '#64748b',
-    marginTop: '8px'
-  },
-  BUTTON_CONTAINER: {
-    display: 'flex',
-    justifyContent: 'center',
-    marginTop: '16px'
-  },
-  COPY_BUTTON: {
-    padding: '8px 16px',
-    backgroundColor: '#3b82f6',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: '6px',
-    fontWeight: '500',
-    cursor: 'pointer',
-    fontSize: '14px',
-    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-  },
-  SUCCESS_BUTTON: {
-    backgroundColor: '#10b981'
-  }
-};
-
-// 요소 표시 대기 관련 텍스트
-const ELEMENT_WAIT_TEXT = {
-  SUCCESS_MESSAGE: '요소가 선택되었습니다',
-  BUTTON_COPY: '사용하기',
-  BUTTON_COPIED: '추가됨 ✓',
-  CODE_HEADING: '생성된 테스트 코드',
-  CODE_DESCRIPTION: '이 코드는 해당 요소가 화면에 나타날 때까지 대기합니다.'
-};
-
-// 요소 제거 대기 관련 텍스트
-const REMOVED_WAIT_TEXT = {
-  SUCCESS_MESSAGE: '요소가 선택되었습니다',
-  BUTTON_COPY: '사용하기',
-  BUTTON_COPIED: '추가됨 ✓',
-  CODE_HEADING: '생성된 테스트 코드',
-  CODE_DESCRIPTION: '이 코드는 해당 요소가 화면에서 사라질 때까지 대기합니다.'
-};
-
-const TIMEOUT = {
-  RESET_BUTTON: 2000
-};
-
-/**
- * 코드 스타일 설정을 위한 상수
- */
-const CODE_DISPLAY_STYLE = {
-  backgroundColor: '#1e293b',
-  color: '#e2e8f0',
-  padding: '12px',
-  borderRadius: '6px',
-  overflowX: 'scroll',
-  margin: '0',
-  whiteSpace: 'nowrap'
-};
-
-/**
- * 선택된 셀렉터로 테스트 코드를 생성하는 순수 함수
- */
-const generateTestCode = (selector: string, timeout: number, waitState: WaitState, waitUntil: string = 'networkidle'): string => {
-  switch (waitState) {
-    case WAIT_STATE.ELEMENT:
-      return `await page.waitForSelector('${selector}', { state: 'visible', timeout: ${timeout} });`;
-    case WAIT_STATE.REMOVED:
-      return `await page.waitForSelector('${selector}', { state: 'hidden', timeout: ${timeout} });`;
-    case WAIT_STATE.NAVIGATION:
-      if (selector && selector.trim() !== '')
-        return `await page.waitForNavigation({ url: '${selector}', waitUntil: '${waitUntil}', timeout: ${timeout} });`;
-      else
-        return `await page.waitForNavigation({ waitUntil: '${waitUntil}', timeout: ${timeout} });`;
-
-    case WAIT_STATE.NETWORK:
-      return `await page.waitForResponse(response => response.url().includes('/api'), { timeout: ${timeout} });`;
-    case WAIT_STATE.TIMEOUT:
-      return `await page.waitForTimeout(${timeout});`;
-    case WAIT_STATE.PAGE_LOAD:
-      return `await page.waitForLoadState('load', { timeout: ${timeout} });`;
-    default:
-      return `await page.waitForSelector('${selector}', { state: 'visible', timeout: ${timeout} });`;
-  }
-};
-
-/**
- * 선택자 정보를 보여주는 컨테이너 요소 생성
- */
-const createSelectorDisplay = (selector: string, injectedScript: InjectedScript): HTMLDivElement => {
-  const container = injectedScript.document.createElement('div');
-  applyStyles(container, STYLES.SELECTOR_CONTAINER);
-  container.textContent = selector;
-  return container;
-};
-
-/**
- * 성공 헤더 요소 생성
- */
-const createSuccessHeader = (injectedScript: InjectedScript, waitState: WaitState): HTMLDivElement => {
-  const header = injectedScript.document.createElement('div');
-  header.style.display = 'flex';
-  header.style.alignItems = 'center';
-  header.style.marginBottom = '12px';
-
-  const icon = injectedScript.document.createElement('span');
-  applyStyles(icon, STYLES.SUCCESS_ICON);
-  icon.textContent = '✅';
-
-  const text = injectedScript.document.createElement('span');
-  applyStyles(text, STYLES.SUCCESS_TEXT);
-
-  // 대기 상태에 따라 텍스트 설정
-  const textContent = waitState === WAIT_STATE.REMOVED
-    ? REMOVED_WAIT_TEXT.SUCCESS_MESSAGE
-    : ELEMENT_WAIT_TEXT.SUCCESS_MESSAGE;
-
-  text.textContent = textContent;
-
-  header.appendChild(icon);
-  header.appendChild(text);
-  return header;
-};
-
-/**
- * 코드 블록 요소 생성
- */
-const createCodeBlock = (testCode: string, injectedScript: InjectedScript, waitState: WaitState): HTMLElement => {
-  const container = injectedScript.document.createElement('div');
-
-  const heading = injectedScript.document.createElement('p');
-  applyStyles(heading, STYLES.CODE_HEADING);
-
-  // 대기 상태에 따라 텍스트 설정
-  const headingText = waitState === WAIT_STATE.REMOVED
-    ? REMOVED_WAIT_TEXT.CODE_HEADING
-    : ELEMENT_WAIT_TEXT.CODE_HEADING;
-
-  heading.textContent = headingText;
-
-  const codeBlock = injectedScript.document.createElement('pre');
-  applyStyles(codeBlock, {
-    ...STYLES.CODE_BLOCK,
-    overflowX: 'scroll',
-    whiteSpace: 'nowrap'
+  // 왼쪽 섹션 생성
+  const leftSection = createLeftSection({
+    document,
+    currentWaitState,
+    activeTimeout: currentTimeout,
+    onOptionSelect: handleOptionSelect
   });
-  codeBlock.textContent = testCode;
 
-  const description = injectedScript.document.createElement('p');
-  applyStyles(description, STYLES.CODE_DESCRIPTION);
+  // 오른쪽 섹션 생성
+  const rightSection = createRightSection(document);
 
-  // 대기 상태에 따라 텍스트 설정
-  const descriptionText = waitState === WAIT_STATE.REMOVED
-    ? REMOVED_WAIT_TEXT.CODE_DESCRIPTION
-    : ELEMENT_WAIT_TEXT.CODE_DESCRIPTION;
+  // 초기 컨텐츠 설정
+  if (currentWaitState) {
+    updateRightSectionContent(rightSection, currentWaitState, currentTimeout, recorder);
+  } else {
+    // 기본 안내 메시지 표시
+    rightSection.appendChild(createPlaceholderContainer(document));
+  }
 
-  description.textContent = descriptionText;
+  // 컨테이너에 섹션 추가
+  container.appendChild(leftSection);
+  container.appendChild(rightSection);
 
-  container.appendChild(heading);
-  container.appendChild(codeBlock);
-  container.appendChild(description);
+  /**
+   * 옵션 선택 핸들러
+   */
+  function handleOptionSelect(waitState: WaitState): void {
+    // 활성화된 대기 상태 업데이트
+    activeWaitState = waitState;
 
-  return container;
-};
+    // 대기 상태 변경 콜백 호출
+    onWaitStateChange(waitState);
 
-/**
- * 레코더에 대기 동작 기록하는 함수
- */
-const recordWaitAction = (recorder: Recorder, waitState: WaitState, selector: string, timeout: number, waitUntil: string = 'networkidle'): void => {
-  if (!recorder)
-    return;
+    // 오른쪽 섹션 내용 업데이트
+    updateRightSectionContent(rightSection, waitState, currentTimeout, recorder);
+  }
 
-  try {
-    // 인스펙터에서 인식 가능한 표준 액션 형식으로 변환
-    let action: any;
+  /**
+   * 오른쪽 섹션 컨텐츠 업데이트
+   */
+  function updateRightSectionContent(
+    container: HTMLElement,
+    waitState: WaitState,
+    timeout: number,
+    recorder: Recorder
+  ): void {
+    // 컨테이너 초기화
+    container.innerHTML = '';
 
+    // 타임아웃 값 업데이트 (WaitForTool 클래스 인스턴스에서 사용)
+    optionContext.get()?.onTimeoutChange?.(timeout);
+
+    // 선택된 대기 유형에 따라 다른 컨텐츠 표시
     switch (waitState) {
       case WAIT_STATE.ELEMENT:
-        action = {
-          name: 'waitForSelector',
-          selector: selector || 'body',
-          options: {
-            state: 'visible',
-            timeout
-          },
-          signals: []
-        };
+        createElementWaitSection(container, timeout, recorder);
         break;
       case WAIT_STATE.REMOVED:
-        action = {
-          name: 'waitForSelector',
-          selector: selector || 'body',
-          options: {
-            state: 'hidden',
-            timeout
-          },
-          signals: []
-        };
+        createRemovedElementWaitSection(container, timeout, recorder);
         break;
       case WAIT_STATE.NAVIGATION:
-        action = {
-          name: 'waitForNavigation',
-          options: {
-            timeout,
-            waitUntil
-          },
-          signals: []
-        };
-
-        // URL이 지정된 경우에만 추가
-        if (selector && selector.trim() !== '')
-          action.options.url = selector; // options 내부로 url 이동
-
+        createNavigationWaitSection(container, timeout, recorder);
         break;
       case WAIT_STATE.NETWORK:
-        action = {
-          name: 'waitForResponse',
-          url: '**/api/**',
-          options: {
-            timeout
-          },
-          signals: [],
-          predicateText: "response => response.url().includes('/api')"
-        };
+        createNetworkWaitSection(container, timeout, recorder);
         break;
       case WAIT_STATE.TIMEOUT:
-        action = {
-          name: 'waitForTimeout',
-          options: {
-            timeout
-          },
-          signals: []
-        };
+        createTimeoutWaitSection(container, timeout, recorder);
         break;
       case WAIT_STATE.PAGE_LOAD:
-        action = {
-          name: 'waitForLoadState',
-          options: {
-            timeout,
-            state: 'load'
-          },
-          signals: []
-        };
+        createPageLoadWaitSection(container, timeout, recorder);
         break;
       default:
-        // 기본 액션은 waitForSelector
-        action = {
-          name: 'waitForSelector',
-          selector: selector || 'body',
-          options: {
-            state: 'visible',
-            timeout
-          },
-          signals: []
-        };
+        container.appendChild(createPlaceholderContainer(recorder.injectedScript.document));
     }
-
-    // 액션 기록
-    recorder.recordAction(action);
-    recorder.setMode('recording');
-    recorder.overlay?.flashToolSucceeded('waitingFor');
-
-  } catch (e) {
-    // 에러 발생 시 조용히 처리
   }
-};
 
-/**
- * 스타일을 HTML 요소에 적용하는 유틸리티 함수
- */
-const applyStyles = (element: HTMLElement, styles: Record<string, string>): void => {
-  Object.entries(styles).forEach(([key, value]) => {
-    element.style[key as any] = value;
-  });
-};
+  /**
+   * 요소 대기 섹션 생성
+   */
+  function createElementWaitSection(container: HTMLElement, timeout: number, recorder: Recorder): void {
+    const injectedScript = recorder.injectedScript;
+    const doc = injectedScript.document;
 
-/**
- * 사용 버튼 요소 생성 및 이벤트 설정
- */
-const createUseButton = (
-  selector: string,
-  timeout: number,
-  waitState: WaitState,
-  injectedScript: InjectedScript,
-  recorder: Recorder
-): HTMLDivElement => {
-  const buttonContainer = injectedScript.document.createElement('div');
-  applyStyles(buttonContainer, STYLES.BUTTON_CONTAINER);
+    // 섹션 생성
+    const section = doc.createElement('div');
+    applyStyles(section, SECTION_STYLES.CONTAINER);
 
-  const useButton = injectedScript.document.createElement('button');
-  applyStyles(useButton, STYLES.COPY_BUTTON);
+    // 헤더
+    const header = doc.createElement('h3');
+    applyStyles(header, SECTION_STYLES.HEADER);
+    header.textContent = '요소 표시 대기';
+    section.appendChild(header);
 
-  // 대기 상태에 따라 텍스트 설정
-  const buttonText = waitState === WAIT_STATE.REMOVED
-    ? REMOVED_WAIT_TEXT.BUTTON_COPY
-    : ELEMENT_WAIT_TEXT.BUTTON_COPY;
+    // 설명
+    const description = doc.createElement('p');
+    applyStyles(description, SECTION_STYLES.DESCRIPTION);
+    description.textContent = '페이지에서 특정 요소가 표시될 때까지 대기합니다. 아래 버튼을 클릭하여 요소를 선택하세요.';
+    section.appendChild(description);
 
-  useButton.textContent = buttonText;
+    // 요소 선택 버튼
+    const elementPickerContainer = doc.createElement('div');
+    section.appendChild(elementPickerContainer);
 
-  useButton.addEventListener('click', () => {
-    try {
+    // 요소 선택 핸들러 설정
+    const elementWaitHandler = createElementWaitHandler({
+      container: elementPickerContainer,
+      recorder,
+      waitState: WAIT_STATE.ELEMENT,
+      currentTimeout: timeout,
+      onElementSelected: (selector: string) => {
+        // 선택된 요소 셀렉터 저장
+        selectedElementSelector = selector;
+
+        handleElementSelection(selector, recorder, WAIT_STATE.ELEMENT);
+
+        // 선택 후 결과 표시
+        if (selector) {
+          // 기존 결과 제거
+          const previousResult = section.querySelector('.result-container');
+          if (previousResult)
+            section.removeChild(previousResult);
+
+          // 최신 타임아웃 값 가져오기
+          const currentTimeout = optionContext.get()?.currentTimeout || timeout;
+
+          // 새 결과 추가
+          const resultElement = createSelectedElementResult(
+              selector,
+              currentTimeout,
+              injectedScript,
+              WAIT_STATE.ELEMENT,
+              recorder
+          );
+
+          // 코드 블록 참조 저장
+          const codeBlock = resultElement.querySelector('pre');
+          if (codeBlock && codeBlock instanceof HTMLPreElement)
+            codeBlockElements[WAIT_STATE.ELEMENT] = codeBlock;
+
+          section.appendChild(resultElement);
+        }
+      }
+    });
+
+    // 핸들러 실행 및 초기 UI 설정
+    elementWaitHandler();
+
+    container.appendChild(section);
+  }
+
+  /**
+   * 요소 제거 대기 섹션 생성
+   */
+  function createRemovedElementWaitSection(container: HTMLElement, timeout: number, recorder: Recorder): void {
+    const injectedScript = recorder.injectedScript;
+    const doc = injectedScript.document;
+
+    // 섹션 생성
+    const section = doc.createElement('div');
+    applyStyles(section, SECTION_STYLES.CONTAINER);
+
+    // 헤더
+    const header = doc.createElement('h3');
+    applyStyles(header, SECTION_STYLES.HEADER);
+    header.textContent = '요소 제거 대기';
+    section.appendChild(header);
+
+    // 설명
+    const description = doc.createElement('p');
+    applyStyles(description, SECTION_STYLES.DESCRIPTION);
+    description.textContent = '페이지에서 특정 요소가 사라질 때까지 대기합니다. 아래 버튼을 클릭하여 요소를 선택하세요.';
+    section.appendChild(description);
+
+    // 요소 선택 버튼
+    const elementPickerContainer = doc.createElement('div');
+    section.appendChild(elementPickerContainer);
+
+    // 요소 선택 핸들러 설정
+    const elementWaitHandler = createElementWaitHandler({
+      container: elementPickerContainer,
+      recorder,
+      waitState: WAIT_STATE.REMOVED,
+      currentTimeout: timeout,
+      onElementSelected: (selector: string) => {
+        // 선택된 제거 요소 셀렉터 저장
+        selectedRemovedSelector = selector;
+
+        handleElementSelection(selector, recorder, WAIT_STATE.REMOVED);
+
+        // 선택 후 결과 표시
+        if (selector) {
+          // 기존 결과 제거
+          const previousResult = section.querySelector('.result-container');
+          if (previousResult)
+            section.removeChild(previousResult);
+
+          // 최신 타임아웃 값 가져오기
+          const currentTimeout = optionContext.get()?.currentTimeout || timeout;
+
+          // 새 결과 추가
+          const resultElement = createSelectedElementResult(
+              selector,
+              currentTimeout,
+              injectedScript,
+              WAIT_STATE.REMOVED,
+              recorder
+          );
+
+          // 코드 블록 참조 저장
+          const codeBlock = resultElement.querySelector('pre');
+          if (codeBlock && codeBlock instanceof HTMLPreElement)
+            codeBlockElements[WAIT_STATE.REMOVED] = codeBlock;
+
+          section.appendChild(resultElement);
+        }
+      }
+    });
+
+    // 핸들러 실행 및 초기 UI 설정
+    elementWaitHandler();
+
+    container.appendChild(section);
+  }
+
+  /**
+   * 네비게이션 대기 섹션 생성
+   */
+  function createNavigationWaitSection(container: HTMLElement, timeout: number, recorder: Recorder): void {
+    const injectedScript = recorder.injectedScript;
+    const doc = injectedScript.document;
+
+    // 섹션 생성
+    const section = doc.createElement('div');
+    applyStyles(section, SECTION_STYLES.CONTAINER);
+
+    // 헤더
+    const header = doc.createElement('h3');
+    applyStyles(header, SECTION_STYLES.HEADER);
+    header.textContent = '페이지 이동 대기';
+    section.appendChild(header);
+
+    // 설명
+    const description = doc.createElement('p');
+    applyStyles(description, SECTION_STYLES.DESCRIPTION);
+    description.textContent = '페이지 이동이 완료될 때까지 대기합니다. URL 패턴을 선택적으로 지정할 수 있습니다.';
+    section.appendChild(description);
+
+    // 현재 URL 가져오기
+    const currentUrl = injectedScript.window.location.href;
+    navigationUrl = currentUrl;
+
+    // URL 입력 컨테이너
+    const urlInputContainer = doc.createElement('div');
+    applyStyles(urlInputContainer, SECTION_STYLES.INPUT_CONTAINER);
+
+    // URL 라벨
+    const urlLabel = doc.createElement('label');
+    applyStyles(urlLabel, SECTION_STYLES.LABEL);
+    urlLabel.textContent = 'URL 패턴 (선택사항)';
+    urlInputContainer.appendChild(urlLabel);
+
+    // URL 입력 필드
+    const urlInput = doc.createElement('input');
+    urlInput.type = 'text';
+    urlInput.placeholder = '예: https://example.com/page*';
+    // 컨텍스트에 URL이 있으면 사용, 없으면 현재 URL 사용
+    urlInput.value = navigationUrl;
+    applyStyles(urlInput, SECTION_STYLES.TEXT_INPUT);
+    urlInputContainer.appendChild(urlInput);
+
+    // 정보 텍스트
+    const urlInfo = doc.createElement('div');
+    applyStyles(urlInfo, SECTION_STYLES.INFO_TEXT);
+    urlInfo.textContent = '와일드카드(*) 사용 가능. 비워두면 모든 네비게이션에 대기합니다.';
+    urlInputContainer.appendChild(urlInfo);
+
+    section.appendChild(urlInputContainer);
+
+    // waitUntil 옵션 선택 컨테이너
+    const waitUntilContainer = doc.createElement('div');
+    applyStyles(waitUntilContainer, SECTION_STYLES.INPUT_CONTAINER);
+
+    // waitUntil 라벨
+    const waitUntilLabel = doc.createElement('label');
+    applyStyles(waitUntilLabel, SECTION_STYLES.LABEL);
+    waitUntilLabel.textContent = '대기 시점';
+    waitUntilContainer.appendChild(waitUntilLabel);
+
+    // waitUntil 드롭다운
+    const waitUntilSelect = doc.createElement('select');
+    applyStyles(waitUntilSelect, SECTION_STYLES.SELECT);
+
+    // waitUntil 옵션 추가
+    WAIT_UNTIL_OPTIONS.forEach(option => {
+      const optionElement = doc.createElement('option');
+      optionElement.value = option.value;
+      optionElement.textContent = option.label;
+
+      // 기존 선택값이 있으면 설정
+      if (navigationWaitUntil === option.value)
+        optionElement.selected = true;
+
+      waitUntilSelect.appendChild(optionElement);
+    });
+
+    waitUntilContainer.appendChild(waitUntilSelect);
+    section.appendChild(waitUntilContainer);
+
+    // 코드 블록 생성
+    const codeContainer = doc.createElement('div');
+    applyStyles(codeContainer, SECTION_STYLES.CODE_CONTAINER);
+
+    // 코드 헤더
+    const codeHeader = doc.createElement('p');
+    applyStyles(codeHeader, COMPONENT_STYLES.CODE_HEADING);
+    codeHeader.textContent = '생성될 테스트 코드';
+    codeContainer.appendChild(codeHeader);
+
+    // 코드 미리보기
+    const codeBlock = doc.createElement('pre');
+    applyStyles(codeBlock, COMPONENT_STYLES.CODE_BLOCK);
+
+    // 코드 생성 및 표시
+    const code = generateTestCode(urlInput.value, timeout, WAIT_STATE.NAVIGATION, waitUntilSelect.value);
+    codeBlock.textContent = code;
+
+    // 코드 블록 참조 저장
+    codeBlockElements[WAIT_STATE.NAVIGATION] = codeBlock;
+
+    codeContainer.appendChild(codeBlock);
+    section.appendChild(codeContainer);
+
+    // 사용 버튼 컨테이너
+    const buttonContainer = doc.createElement('div');
+    applyStyles(buttonContainer, SECTION_STYLES.BUTTON_CONTAINER);
+
+    // 사용 버튼
+    const useButton = doc.createElement('button');
+    applyStyles(useButton, COMPONENT_STYLES.COPY_BUTTON);
+    useButton.textContent = '사용하기';
+
+    useButton.addEventListener('click', () => {
       // 버튼 상태 변경
-      const originalText = useButton.textContent;
+      useButton.textContent = '추가됨 ✓';
+      useButton.style.backgroundColor = COMPONENT_STYLES.SUCCESS_BUTTON.backgroundColor;
 
-      // 대기 상태에 따라 텍스트 설정
-      const copiedText = waitState === WAIT_STATE.REMOVED
-        ? REMOVED_WAIT_TEXT.BUTTON_COPIED
-        : ELEMENT_WAIT_TEXT.BUTTON_COPIED;
+      // 최신 타임아웃 값 가져오기
+      const currentTimeout = optionContext.get()?.currentTimeout || timeout;
 
-      useButton.textContent = copiedText;
-      useButton.style.backgroundColor = STYLES.SUCCESS_BUTTON.backgroundColor;
-
-      // 통일된 함수 사용
-      recordWaitAction(recorder, waitState, selector, timeout, optionContext.value?.waitUntil || 'networkidle');
+      // 액션 기록
+      recordWaitAction(
+          recorder,
+          WAIT_STATE.NAVIGATION,
+          urlInput.value,
+          currentTimeout,
+          waitUntilSelect.value
+      );
 
       // 버튼 상태 복구
       setTimeout(() => {
-        useButton.textContent = originalText;
-        useButton.style.backgroundColor = STYLES.COPY_BUTTON.backgroundColor;
-      }, TIMEOUT.RESET_BUTTON);
-    } catch (e) {
-      // 예외 처리
-    }
-  });
+        useButton.textContent = '사용하기';
+        useButton.style.backgroundColor = COMPONENT_STYLES.COPY_BUTTON.backgroundColor;
+      }, 2000);
+    });
 
-  buttonContainer.appendChild(useButton);
-  return buttonContainer;
-};
+    buttonContainer.appendChild(useButton);
+    section.appendChild(buttonContainer);
 
-/**
- * 선택된 요소 결과 컨테이너 생성
- */
-const createSelectedElementResult = (
-  selector: string,
-  timeout: number,
-  injectedScript: InjectedScript,
-  waitState: WaitState,
-  recorder: Recorder
-): HTMLDivElement => {
-  const resultDiv = injectedScript.document.createElement('div');
-  applyStyles(resultDiv, STYLES.RESULT_CONTAINER);
+    // URL 또는 waitUntil이 변경되면 코드 블록 업데이트 및 상태 저장
+    urlInput.addEventListener('input', () => {
+      navigationUrl = urlInput.value;
+      updateCodeBlockForCurrentState(currentTimeout);
+    });
 
-  const testCode = generateTestCode(selector, timeout, waitState, optionContext.value?.waitUntil || 'networkidle');
+    waitUntilSelect.addEventListener('change', () => {
+      navigationWaitUntil = waitUntilSelect.value;
+      updateCodeBlockForCurrentState(currentTimeout);
+    });
 
-  resultDiv.appendChild(createSuccessHeader(injectedScript, waitState));
-  resultDiv.appendChild(createSelectorDisplay(selector, injectedScript));
-  resultDiv.appendChild(createCodeBlock(testCode, injectedScript, waitState));
-  resultDiv.appendChild(createUseButton(selector, timeout, waitState, injectedScript, recorder));
-
-  return resultDiv;
-};
-
-/**
- * 오른쪽 섹션 UI 업데이트 함수
- */
-const updateRightSectionUI = (
-  rightSection: HTMLElement,
-  optionContext: { value: OptionContextValue | null },
-  currentTimeout: number,
-  placeholderContainer: HTMLElement,
-  injectedScript: InjectedScript,
-  recorder: Recorder
-): void => {
-  rightSection.innerHTML = ''; // 기존 내용 초기화
-
-  // null 체크 추가
-  if (!optionContext.value) {
-    rightSection.appendChild(placeholderContainer);
-    return;
+    container.appendChild(section);
   }
 
-  const hasValidSelector = optionContext.value.selector;
-  const waitState = optionContext.value.waitState;
-
-  if (hasValidSelector && waitState && (waitState === WAIT_STATE.ELEMENT || waitState === WAIT_STATE.REMOVED)) {
-    // 선택된 요소의 정보를 보여줌
-    const resultElement = createSelectedElementResult(
-        hasValidSelector,
-        currentTimeout,
-        injectedScript,
-        waitState,
-        recorder
-    );
-    rightSection.appendChild(resultElement);
-  } else if (waitState) {
-    // 다른 대기 상태에 대한 UI 업데이트 처리
-    testFn({
-      recorder,
-      container: rightSection,
-      waitState,
-      currentTimeout,
-      onTimeoutChange: optionContext.value.onTimeoutChange,
-      url: optionContext.value.url,
-      onUrlChange: optionContext.value.onUrlChange,
-      waitUntil: optionContext.value.waitUntil || 'networkidle',
-      onWaitUntilChange: optionContext.value.onWaitUntilChange
-    });
-  } else {
-    // 안내 메시지 표시
-    rightSection.appendChild(placeholderContainer);
-  }
-};
-
-/**
- * 대기 옵션 UI를 생성하는 함수
- */
-export function createWaitOptionsContent({
-  document,
-  currentWaitState,
-  currentTimeout,
-  onWaitStateChange,
-  onTimeoutChange,
-  recorder
-}: {
-  document: Document;
-  currentWaitState: WaitState | null;
-  currentTimeout: number;
-  onWaitStateChange: (state: WaitState) => void;
-  onTimeoutChange: (timeout: number) => void;
-  recorder: Recorder;
-}): HTMLElement {
-  // 최상위 컨테이너
-  const content = document.createElement('div');
-  content.classList.add('wait-options-container');
-  content.style.width = '100%'; // 전체 너비 사용
-  content.style.display = 'flex'; // 가로형 레이아웃으로 변경
-  content.style.gap = '20px'; // 좌우 영역 사이 간격
-  content.style.maxHeight = '80vh'; // 최대 높이 제한
-  content.style.overflow = 'auto'; // 내용이 많을 경우 스크롤 가능하도록
-  content.style.fontFamily = 'system-ui, -apple-system, sans-serif';
-
-  // 현재 타임아웃 값 관리를 위한 상태 변수
-  let activeTimeout = currentTimeout;
-  let activeUrl = ''; // URL 입력 값 관리를 위한 변수
-  let activeWaitUntil = 'networkidle'; // waitUntil 옵션 관리를 위한 변수
-
-  // 1. 왼쪽 영역 (옵션 선택 영역)
-  const leftSection = document.createElement('div');
-  leftSection.style.flex = '0 0 280px'; // 왼쪽 영역 너비 고정
-  leftSection.style.display = 'flex';
-  leftSection.style.flexDirection = 'column';
-
-  // 헤더 섹션
-  const headerSection = document.createElement('div');
-  headerSection.style.marginBottom = '20px';
-  leftSection.appendChild(headerSection);
-
-  // 옵션 선택 영역
-  const optionsSection = document.createElement('div');
-  optionsSection.style.marginBottom = '24px';
-  optionsSection.style.display = 'flex';
-  optionsSection.style.flexDirection = 'column'; // 세로로 옵션 나열
-  optionsSection.style.gap = '8px';
-
-  // 각 대기 옵션 생성 - 초기에는 어떤 옵션도 선택하지 않음
-  waitOptions.forEach(option => {
-    // 옵션 카드 생성
-    const optionCard = document.createElement('div');
-    optionCard.classList.add('wait-option-card');
-    optionCard.dataset.waitState = option.id; // 데이터 속성 추가
-    optionCard.style.padding = '12px';
-    optionCard.style.borderRadius = '8px';
-    optionCard.style.border = '1px solid #e5e7eb';
-    optionCard.style.cursor = 'pointer';
-    optionCard.style.transition = 'all 0.2s ease';
-    optionCard.style.display = 'flex';
-    optionCard.style.alignItems = 'center';
-    optionCard.style.gap = '12px';
-    // 초기에는 어떤 옵션도 선택되지 않도록 설정
-    optionCard.style.backgroundColor = '#ffffff';
-    optionCard.style.borderColor = '#e5e7eb';
-    optionCard.style.boxShadow = 'none';
-
-    // 현재 waitState가 있고 이 카드와 일치하면 선택된 스타일 적용
-    if (currentWaitState && currentWaitState === option.id)
-      highlightSelectedCard(optionCard);
-
-
-    // 아이콘 컨테이너
-    const iconContainer = document.createElement('div');
-    iconContainer.classList.add('wait-option-icon');
-    iconContainer.style.display = 'flex';
-    iconContainer.style.alignItems = 'center';
-    iconContainer.style.justifyContent = 'center';
-    iconContainer.style.width = '36px';
-    iconContainer.style.height = '36px';
-    iconContainer.style.borderRadius = '6px';
-    iconContainer.style.backgroundColor = '#f9fafb';
-    iconContainer.style.color = '#6b7280';
-    iconContainer.style.fontSize = '22px';
-    iconContainer.textContent = option.icon;
-    optionCard.appendChild(iconContainer);
-
-    // 텍스트 컨테이너
-    const textContainer = document.createElement('div');
-    textContainer.classList.add('wait-option-text');
-    textContainer.style.flex = '1';
-
-    const labelElement = document.createElement('div');
-    labelElement.classList.add('wait-option-label');
-    labelElement.textContent = option.label;
-    labelElement.style.fontWeight = '500';
-    labelElement.style.fontSize = '14px';
-    labelElement.style.color = '#374151';
-    labelElement.style.marginBottom = '2px';
-    textContainer.appendChild(labelElement);
-
-    const descElement = document.createElement('div');
-    descElement.classList.add('wait-option-desc');
-    descElement.textContent = option.description;
-    descElement.style.fontSize = '12px';
-    descElement.style.color = '#6b7280';
-    textContainer.appendChild(descElement);
-
-    optionCard.appendChild(textContainer);
-
-    // 선택 표시 (라디오 버튼 스타일)
-    const radioIndicator = document.createElement('div');
-    radioIndicator.classList.add('wait-option-radio');
-    radioIndicator.style.width = '18px';
-    radioIndicator.style.height = '18px';
-    radioIndicator.style.borderRadius = '50%';
-    radioIndicator.style.border = '2px solid #d1d5db';
-    radioIndicator.style.display = 'flex';
-    radioIndicator.style.alignItems = 'center';
-    radioIndicator.style.justifyContent = 'center';
-
-    optionCard.appendChild(radioIndicator);
-    optionsSection.appendChild(optionCard);
-  });
-
-  leftSection.appendChild(optionsSection);
-
-  // 타임아웃 설정 섹션
-  const timeoutSection = document.createElement('div');
-  timeoutSection.style.padding = '16px';
-  timeoutSection.style.backgroundColor = '#f8fafc';
-  timeoutSection.style.borderRadius = '8px';
-  timeoutSection.style.border = '1px solid #e2e8f0';
-
-  // 타이틀 컨테이너
-  const timeoutTitleContainer = document.createElement('div');
-  timeoutTitleContainer.style.display = 'flex';
-  timeoutTitleContainer.style.alignItems = 'center';
-  timeoutTitleContainer.style.marginBottom = '12px';
-
-  const timeoutIcon = document.createElement('div');
-  timeoutIcon.textContent = '⏱️';
-  timeoutIcon.style.fontSize = '20px';
-  timeoutIcon.style.marginRight = '8px';
-  timeoutTitleContainer.appendChild(timeoutIcon);
-
-  const timeoutTitle = document.createElement('div');
-  timeoutTitle.textContent = '대기 시간 설정';
-  timeoutTitle.style.fontWeight = '500';
-  timeoutTitle.style.fontSize = '15px';
-  timeoutTitle.style.color = '#0f172a';
-  timeoutTitleContainer.appendChild(timeoutTitle);
-
-  timeoutSection.appendChild(timeoutTitleContainer);
-
-  // 입력 영역
-  const inputContainer = document.createElement('div');
-  inputContainer.style.marginBottom = '8px';
-
-  const labelAndUnitContainer = document.createElement('div');
-  labelAndUnitContainer.style.display = 'flex';
-  labelAndUnitContainer.style.justifyContent = 'space-between';
-  labelAndUnitContainer.style.marginBottom = '6px';
-
-  const inputLabel = document.createElement('label');
-  inputLabel.textContent = '시간 (밀리초)';
-  inputLabel.style.fontSize = '13px';
-  inputLabel.style.color = '#4b5563';
-  labelAndUnitContainer.appendChild(inputLabel);
-
-  const unitLabel = document.createElement('div');
-  unitLabel.textContent = '1000ms = 1초';
-  unitLabel.style.fontSize = '13px';
-  unitLabel.style.color = '#6b7280';
-  labelAndUnitContainer.appendChild(unitLabel);
-
-  inputContainer.appendChild(labelAndUnitContainer);
-
-  // 입력 필드와 버튼 그룹
-  const inputGroup = document.createElement('div');
-  inputGroup.style.display = 'flex';
-  inputGroup.style.position = 'relative';
-
-  const timeoutInput = document.createElement('input');
-  timeoutInput.type = 'number';
-  timeoutInput.value = String(activeTimeout);
-  timeoutInput.min = '100';
-  timeoutInput.step = '500';
-  timeoutInput.style.width = '100%';
-  timeoutInput.style.padding = '10px 12px';
-  timeoutInput.style.borderRadius = '6px';
-  timeoutInput.style.border = '1px solid #d1d5db';
-  timeoutInput.style.fontSize = '14px';
-  timeoutInput.style.backgroundColor = '#ffffff';
-  timeoutInput.style.outline = 'none';
-  timeoutInput.style.transition = 'border-color 0.2s ease';
-
-  timeoutInput.addEventListener('focus', () => {
-    timeoutInput.style.borderColor = '#3b82f6';
-    timeoutInput.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
-  });
-
-  timeoutInput.addEventListener('blur', () => {
-    timeoutInput.style.borderColor = '#d1d5db';
-    timeoutInput.style.boxShadow = 'none';
-  });
-
-  // 2. 오른쪽 영역 (결과 표시 영역)
-  const rightSection = document.createElement('div');
-  rightSection.id = 'wait-options-right-section';
-  rightSection.style.flex = '1'; // 남은 공간 모두 차지
-  rightSection.style.display = 'flex';
-  rightSection.style.flexDirection = 'column';
-  rightSection.style.minWidth = '300px'; // 최소 너비 설정
-  rightSection.style.border = '1px solid #e5e7eb';
-  rightSection.style.borderRadius = '8px';
-  rightSection.style.backgroundColor = '#f9fafb';
-
-  // 초기 안내 메시지 표시 (항상 보이도록)
-  const placeholderContainer = document.createElement('div');
-  placeholderContainer.style.display = 'flex';
-  placeholderContainer.style.flexDirection = 'column';
-  placeholderContainer.style.alignItems = 'center';
-  placeholderContainer.style.justifyContent = 'center';
-  placeholderContainer.style.height = '100%';
-  placeholderContainer.style.padding = '40px 20px';
-  placeholderContainer.style.textAlign = 'center';
-
-  const placeholderIcon = document.createElement('div');
-  placeholderIcon.textContent = '👈';
-  placeholderIcon.style.fontSize = '32px';
-  placeholderIcon.style.marginBottom = '16px';
-  placeholderContainer.appendChild(placeholderIcon);
-
-  const placeholderText = document.createElement('div');
-  placeholderText.textContent = '왼쪽에서 대기 옵션을 선택해주세요';
-  placeholderText.style.fontSize = '16px';
-  placeholderText.style.fontWeight = '500';
-  placeholderText.style.color = '#4b5563';
-  placeholderContainer.appendChild(placeholderText);
-
-  const placeholderDesc = document.createElement('div');
-  placeholderDesc.textContent = '각 옵션을 선택하면 해당 옵션에 대한 설정을 할 수 있습니다.';
-  placeholderDesc.style.fontSize = '14px';
-  placeholderDesc.style.color = '#6b7280';
-  placeholderDesc.style.marginTop = '12px';
-  placeholderContainer.appendChild(placeholderDesc);
-
-  // 사용자 정의 타임아웃 값 변경 핸들러
-  const handleTimeoutChange = (value: number) => {
-    // 내부 상태 업데이트
-    activeTimeout = value;
-
-    // 입력 필드 값 업데이트
-    timeoutInput.value = String(value);
-
-    // 부모로 값 전달
-    if (typeof onTimeoutChange === 'function')
-      onTimeoutChange(value);
-
-
-    // optionContext 업데이트
-    if (optionContext.value)
-      optionContext.value.currentTimeout = value;
-
-
-    // 현재 옵션이 있으면 UI 업데이트
-    if (optionContext.value && optionContext.value.waitState) {
-      updateRightSectionUI(
-          rightSection,
-          optionContext,
-          value,
-          placeholderContainer,
-          recorder.injectedScript,
-          recorder
-      );
-    }
-  };
-
-  // 타임아웃 입력 이벤트 핸들러
-  timeoutInput.addEventListener('input', e => {
-    const value = parseInt((e.target as HTMLInputElement).value, 10);
-    if (!isNaN(value) && value > 0)
-      handleTimeoutChange(value);
-
-  });
-
-  inputGroup.appendChild(timeoutInput);
-
-  // 빠른 시간 선택 버튼들
-  const quickTimeButtons = [
-    { value: 1000, label: '1초' },
-    { value: 3000, label: '3초' },
-    { value: 5000, label: '5초' },
-    { value: 10000, label: '10초' }
-  ];
-
-  const quickButtonsContainer = document.createElement('div');
-  quickButtonsContainer.style.display = 'flex';
-  quickButtonsContainer.style.marginTop = '8px';
-  quickButtonsContainer.style.gap = '8px';
-
-  quickTimeButtons.forEach(btn => {
-    const button = document.createElement('button');
-    button.textContent = btn.label;
-    button.style.padding = '6px 10px';
-    button.style.fontSize = '12px';
-    button.style.borderRadius = '4px';
-    button.style.border = '1px solid #d1d5db';
-    button.style.backgroundColor = activeTimeout === btn.value ? '#e0edff' : '#f9fafb';
-    button.style.color = activeTimeout === btn.value ? '#2563eb' : '#4b5563';
-    button.style.cursor = 'pointer';
-    button.style.transition = 'all 0.2s ease';
-    button.style.fontWeight = activeTimeout === btn.value ? '500' : 'normal';
-
-    button.addEventListener('mouseover', () => {
-      if (activeTimeout !== btn.value)
-        button.style.backgroundColor = '#f3f4f6';
-    });
-
-    button.addEventListener('mouseout', () => {
-      if (activeTimeout !== btn.value)
-        button.style.backgroundColor = '#f9fafb';
-    });
-
-    button.addEventListener('click', e => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      // 모든 버튼 스타일 초기화
-      quickButtonsContainer.querySelectorAll('button').forEach(b => {
-        const btnEl = b as HTMLElement;
-        btnEl.style.backgroundColor = '#f9fafb';
-        btnEl.style.color = '#4b5563';
-        btnEl.style.fontWeight = 'normal';
-      });
-
-      // 선택된 버튼 강조
-      button.style.backgroundColor = '#e0edff';
-      button.style.color = '#2563eb';
-      button.style.fontWeight = '500';
-
-      // 타임아웃 값 변경 처리
-      handleTimeoutChange(btn.value);
-    });
-
-    quickButtonsContainer.appendChild(button);
-  });
-
-  inputContainer.appendChild(inputGroup);
-  inputContainer.appendChild(quickButtonsContainer);
-
-  timeoutSection.appendChild(inputContainer);
-
-  // 도움말 텍스트
-  const helpText = document.createElement('div');
-  helpText.textContent = '일반적으로 5-30초(5000-30000 밀리초) 사이의 값을 권장합니다.';
-  helpText.style.fontSize = '12px';
-  helpText.style.color = '#64748b';
-  helpText.style.marginTop = '8px';
-  timeoutSection.appendChild(helpText);
-
-  leftSection.appendChild(timeoutSection);
-
-  // optionContext 초기화 또는 업데이트
-  if (currentWaitState) {
-    optionContext.set({
-      recorder,
-      container: rightSection,
-      waitState: currentWaitState,
-      currentTimeout: activeTimeout,
-      onTimeoutChange: handleTimeoutChange,
-      onWaitStateChange,
-      url: activeUrl,
-      onUrlChange: (url: string) => {
-        activeUrl = url;
-      },
-      waitUntil: activeWaitUntil,
-      onWaitUntilChange: (waitUntil: string) => {
-        activeWaitUntil = waitUntil;
-      }
-    });
-
-    // 초기 UI 업데이트
-    updateRightSectionUI(
-        rightSection,
-        optionContext,
-        activeTimeout,
-        placeholderContainer,
-        recorder.injectedScript,
-        recorder
-    );
-  } else {
-    // 안내 메시지 표시
-    rightSection.appendChild(placeholderContainer);
-  }
-
-  // 컨테이너에 좌우 섹션 추가
-  content.appendChild(leftSection);
-  content.appendChild(rightSection);
-
-  // 이벤트 위임(Event Delegation) 패턴 사용
-  optionsSection.addEventListener('click', event => {
-    // 클릭된 요소가 카드인지 확인
-    const optionCard = findClosestElement(event.target as HTMLElement, '.wait-option-card');
-    if (!optionCard)
-      return;
-
-    // 선택된 대기 상태 ID 가져오기
-    const waitStateId = optionCard.dataset.waitState as WaitState;
-    if (!waitStateId)
-      return;
-
-    // 모든 카드 스타일 초기화
-    resetAllOptionCards(optionsSection);
-
-    // 선택된 카드 스타일 적용
-    highlightSelectedCard(optionCard as HTMLElement);
-
-    // 상태 변경 콜백 호출
-    if (typeof onWaitStateChange === 'function')
-      onWaitStateChange(waitStateId);
-
-
-    // 오른쪽 섹션 초기화
-    rightSection.innerHTML = '';
-
-    // optionContext 업데이트
-    optionContext.set({
-      recorder,
-      container: rightSection,
-      waitState: waitStateId,
-      currentTimeout: activeTimeout,
-      onTimeoutChange: handleTimeoutChange,
-      onWaitStateChange,
-      url: activeUrl,
-      onUrlChange: (url: string) => {
-        activeUrl = url;
-      },
-      waitUntil: activeWaitUntil,
-      onWaitUntilChange: (waitUntil: string) => {
-        activeWaitUntil = waitUntil;
-      }
-    });
-
-    // 상세 옵션 컨텐츠
-    testFn({
-      recorder,
-      container: rightSection,
-      waitState: waitStateId,
-      currentTimeout: activeTimeout,
-      onTimeoutChange: handleTimeoutChange,
-      url: activeUrl,
-      onUrlChange: (url: string) => {
-        activeUrl = url;
-      },
-      waitUntil: activeWaitUntil,
-      onWaitUntilChange: (waitUntil: string) => {
-        activeWaitUntil = waitUntil;
-      }
-    });
-  });
-
-  return content;
-}
-
-/**
- * 테스트 기능 구현 함수
- */
-function testFn(options: {
-  recorder: Recorder;
-  container: HTMLElement;
-  waitState: WaitState;
-  currentTimeout?: number;
-  onTimeoutChange?: (timeout: number) => void;
-  url?: string;
-  onUrlChange?: (url: string) => void;
-  waitUntil?: string;
-  onWaitUntilChange?: (waitUntil: string) => void;
-}) {
-  // 컨테이너를 초기화하여 이전 내용 제거
-  options.container.innerHTML = '';
-
-  // 문서의 소유자로부터 document 객체를 얻음 (InjectedScript 사용하지 않음)
-  const doc = options.container.ownerDocument;
-
-  // 레코더 인스턴스 참조 - window에 저장된 특수 변수 사용
-  // 타입 단언을 통해 접근
-  const _injectedRecorder = options.recorder;
-
-  switch (options.waitState) {
-    case WAIT_STATE.ELEMENT:
-    case WAIT_STATE.REMOVED:
-      if (_injectedRecorder) {
-        // 레코더가 있는 경우 handleElementWait 호출
-        handleElementWait({
-          container: options.container,
-          currentTimeout: options.currentTimeout,
-          onElementSelected: selector => {
-            // optionContext에 값 세팅
-            if (optionContext && optionContext.value) {
-              // 선택된 셀렉터 저장
-              optionContext.value.selector = selector;
-
-              // 상태 업데이트 (필요한 경우)
-              if (optionContext.value.onWaitStateChange)
-                optionContext.value.onWaitStateChange(options.waitState);
-
-              // 요소 선택 완료 후 대화상자를 다시 표시하여 UI 업데이트
-              setTimeout(() => {
-                showWaitForDialog(_injectedRecorder);
-              }, 10);
-            }
-          },
-          recorder: _injectedRecorder
-        });
-      } else {
-        // 레코더가 없는 경우 - 대체 UI 표시
-        const errorMsg = doc.createElement('div');
-        errorMsg.style.padding = '16px';
-        errorMsg.style.backgroundColor = '#fee2e2';
-        errorMsg.style.color = '#991b1b';
-        errorMsg.style.borderRadius = '8px';
-        errorMsg.style.border = '1px solid #fecaca';
-        errorMsg.style.marginBottom = '16px';
-        errorMsg.textContent = '요소 선택을 위한 레코더를 찾을 수 없습니다.';
-        options.container.appendChild(errorMsg);
-      }
-      break;
-    case WAIT_STATE.NAVIGATION:
-      // 네비게이션 대기 기능 구현
-      const navigationContent = doc.createElement('div');
-      navigationContent.style.padding = '16px';
-      navigationContent.style.backgroundColor = '#f0f9ff';
-      navigationContent.style.borderRadius = '8px';
-      navigationContent.style.border = '1px solid #bae6fd';
-
-      // 헤더 및 설명 추가
-      const navHeader = doc.createElement('h3');
-      navHeader.style.margin = '0 0 12px 0';
-      navHeader.style.fontSize = '16px';
-      navHeader.style.color = '#0c4a6e';
-      navHeader.textContent = '페이지 이동 대기';
-      navigationContent.appendChild(navHeader);
-
-      const navDesc = doc.createElement('p');
-      navDesc.style.marginBottom = '16px';
-      navDesc.style.fontSize = '14px';
-      navDesc.style.color = '#334155';
-      navDesc.textContent = '지정된 URL 패턴과 일치하는 페이지 이동이 완료될 때까지 대기합니다.';
-      navigationContent.appendChild(navDesc);
-
-      // 현재 URL 가져오기 - 기본값으로 사용
-      const currentUrl = options.url || _injectedRecorder.injectedScript.window.location.href;
-
-      // URL 입력 영역 추가
-      const urlInputContainer = doc.createElement('div');
-      urlInputContainer.style.marginBottom = '16px';
-
-      const urlLabel = doc.createElement('label');
-      urlLabel.textContent = 'URL 패턴 (선택사항)';
-      urlLabel.style.display = 'block';
-      urlLabel.style.fontSize = '14px';
-      urlLabel.style.fontWeight = '500';
-      urlLabel.style.color = '#334155';
-      urlLabel.style.marginBottom = '8px';
-      urlInputContainer.appendChild(urlLabel);
-
-      const urlInput = doc.createElement('input');
-      urlInput.type = 'text';
-      urlInput.value = currentUrl;
-      urlInput.placeholder = '예: https://example.com/ 또는 */example*';
-      urlInput.style.width = '100%';
-      urlInput.style.padding = '10px 12px';
-      urlInput.style.borderRadius = '6px';
-      urlInput.style.border = '1px solid #d1d5db';
-      urlInput.style.fontSize = '14px';
-      urlInput.style.backgroundColor = '#ffffff';
-      urlInput.style.outline = 'none';
-      urlInput.style.transition = 'border-color 0.2s ease';
-      urlInputContainer.appendChild(urlInput);
-
-      // URL 정보 텍스트 추가
-      const urlInfo = doc.createElement('p');
-      urlInfo.textContent = 'URL을 정확히 입력하거나 와일드카드(*)를 사용할 수 있습니다.';
-      urlInfo.style.fontSize = '12px';
-      urlInfo.style.color = '#6b7280';
-      urlInfo.style.marginTop = '4px';
-      urlInputContainer.appendChild(urlInfo);
-
-      // waitUntil 선택 영역 추가
-      const waitUntilContainer = doc.createElement('div');
-      waitUntilContainer.style.marginBottom = '16px';
-
-      const waitUntilLabel = doc.createElement('label');
-      waitUntilLabel.textContent = '로드 완료 조건';
-      waitUntilLabel.style.display = 'block';
-      waitUntilLabel.style.fontSize = '14px';
-      waitUntilLabel.style.fontWeight = '500';
-      waitUntilLabel.style.color = '#334155';
-      waitUntilLabel.style.marginBottom = '8px';
-      waitUntilContainer.appendChild(waitUntilLabel);
-
-      // 드롭다운 생성
-      const waitUntilSelect = doc.createElement('select');
-      waitUntilSelect.style.width = '100%';
-      waitUntilSelect.style.padding = '10px 12px';
-      waitUntilSelect.style.borderRadius = '6px';
-      waitUntilSelect.style.border = '1px solid #d1d5db';
-      waitUntilSelect.style.fontSize = '14px';
-      waitUntilSelect.style.backgroundColor = '#ffffff';
-      waitUntilSelect.style.outline = 'none';
-      waitUntilSelect.style.transition = 'border-color 0.2s ease';
-      waitUntilSelect.style.appearance = 'auto';
-
-      // waitUntil 옵션 정의
-      const waitUntilOptions = [
-        { value: 'networkidle', label: 'networkidle - 네트워크 요청이 없는 상태' },
-        { value: 'commit', label: 'commit - 모든 네트워크 요청이 완료된 후' },
-        { value: 'load', label: 'load - 페이지 로드 완료' },
-        { value: 'domcontentloaded', label: 'domcontentloaded - DOM 로드 완료' },
-      ];
-
-      // 옵션 추가
-      waitUntilOptions.forEach(option => {
-        const optionElement = doc.createElement('option');
-        optionElement.value = option.value;
-        optionElement.textContent = option.label;
-
-        // 기본값 선택
-        if (options.waitUntil === option.value || (!options.waitUntil && option.value === 'networkidle'))
-          optionElement.selected = true;
-
-
-        waitUntilSelect.appendChild(optionElement);
-      });
-
-      // 이벤트 리스너 추가
-      waitUntilSelect.addEventListener('change', () => {
-        if (options.onWaitUntilChange)
-          options.onWaitUntilChange(waitUntilSelect.value);
-
-
-        // optionContext 업데이트
-        if (optionContext.value)
-          optionContext.value.waitUntil = waitUntilSelect.value;
-
-
-        // 코드 예시 업데이트
-        const updatedCode = generateTestCode(
-            urlInput.value,
-            options.currentTimeout || 5000,
-            WAIT_STATE.NAVIGATION,
-            waitUntilSelect.value
-        );
-        codeExample.textContent = updatedCode;
-      });
-
-      waitUntilContainer.appendChild(waitUntilSelect);
-
-      // waitUntil 설명 추가
-      const waitUntilInfo = doc.createElement('p');
-      waitUntilInfo.textContent = '페이지 이동이 완료되었다고 간주할 조건을 선택합니다.';
-      waitUntilInfo.style.fontSize = '12px';
-      waitUntilInfo.style.color = '#6b7280';
-      waitUntilInfo.style.marginTop = '4px';
-      waitUntilContainer.appendChild(waitUntilInfo);
-
-      // URL 입력 이벤트 핸들러
-      urlInput.addEventListener('input', () => {
-        if (options.onUrlChange)
-          options.onUrlChange(urlInput.value);
-
-
-        // optionContext 업데이트
-        if (optionContext.value)
-          optionContext.value.url = urlInput.value;
-
-
-        // 코드 예시 업데이트
-        const updatedCode = generateTestCode(
-            urlInput.value,
-            options.currentTimeout || 5000,
-            WAIT_STATE.NAVIGATION,
-            waitUntilSelect.value
-        );
-        codeExample.textContent = updatedCode;
-      });
-
-      // 컨텐츠에 URL 입력 추가
-      navigationContent.appendChild(urlInputContainer);
-
-      // 컨텐츠에 waitUntil 선택 추가
-      navigationContent.appendChild(waitUntilContainer);
-
-      // 코드 예시 추가
-      const navCode = generateTestCode(
-          currentUrl,
-          options.currentTimeout || 5000,
-          WAIT_STATE.NAVIGATION,
-          options.waitUntil || 'networkidle'
+  /**
+   * 네트워크 대기 섹션 생성
+   */
+  function createNetworkWaitSection(container: HTMLElement, timeout: number, recorder: Recorder): void {
+    const injectedScript = recorder.injectedScript;
+    const doc = injectedScript.document;
+
+    // 섹션 생성
+    const section = doc.createElement('div');
+    applyStyles(section, SECTION_STYLES.CONTAINER);
+
+    // 헤더
+    const header = doc.createElement('h3');
+    applyStyles(header, SECTION_STYLES.HEADER);
+    header.textContent = 'API 요청 대기';
+    section.appendChild(header);
+
+    // 설명
+    const description = doc.createElement('p');
+    applyStyles(description, SECTION_STYLES.DESCRIPTION);
+    description.textContent = '특정 API 요청이 완료될 때까지 대기합니다. API 경로를 포함한 URL의 일부를 입력하세요.';
+    section.appendChild(description);
+
+    // URL 패턴 입력 컨테이너
+    const urlPatternContainer = doc.createElement('div');
+    applyStyles(urlPatternContainer, SECTION_STYLES.INPUT_CONTAINER);
+
+    // URL 패턴 라벨
+    const urlPatternLabel = doc.createElement('label');
+    applyStyles(urlPatternLabel, SECTION_STYLES.LABEL);
+    urlPatternLabel.textContent = 'URL 패턴 (API 경로)';
+    urlPatternContainer.appendChild(urlPatternLabel);
+
+    // URL 패턴 입력 필드
+    const urlPatternInput = doc.createElement('input');
+    urlPatternInput.type = 'text';
+    urlPatternInput.placeholder = '예: /api/users 또는 api.example.com';
+    urlPatternInput.value = networkUrlPattern;
+    applyStyles(urlPatternInput, SECTION_STYLES.TEXT_INPUT);
+    urlPatternContainer.appendChild(urlPatternInput);
+
+    section.appendChild(urlPatternContainer);
+
+    // 코드 블록 생성
+    const codeContainer = doc.createElement('div');
+    applyStyles(codeContainer, SECTION_STYLES.CODE_CONTAINER);
+
+    // 코드 헤더
+    const codeHeader = doc.createElement('p');
+    applyStyles(codeHeader, COMPONENT_STYLES.CODE_HEADING);
+    codeHeader.textContent = '생성될 테스트 코드';
+    codeContainer.appendChild(codeHeader);
+
+    // 코드 미리보기
+    const codeBlock = doc.createElement('pre');
+    applyStyles(codeBlock, COMPONENT_STYLES.CODE_BLOCK);
+
+    // 코드 생성 및 표시
+    codeBlock.textContent = `await page.waitForResponse(response => response.url().includes('${urlPatternInput.value}'), { timeout: ${timeout} });`;
+
+    // 코드 블록 참조 저장
+    codeBlockElements[WAIT_STATE.NETWORK] = codeBlock;
+
+    codeContainer.appendChild(codeBlock);
+    section.appendChild(codeContainer);
+
+    // 사용 버튼 컨테이너
+    const buttonContainer = doc.createElement('div');
+    applyStyles(buttonContainer, SECTION_STYLES.BUTTON_CONTAINER);
+
+    // 사용 버튼
+    const useButton = doc.createElement('button');
+    applyStyles(useButton, COMPONENT_STYLES.COPY_BUTTON);
+    useButton.textContent = '사용하기';
+
+    useButton.addEventListener('click', () => {
+      // 버튼 상태 변경
+      useButton.textContent = '추가됨 ✓';
+      useButton.style.backgroundColor = COMPONENT_STYLES.SUCCESS_BUTTON.backgroundColor;
+
+      // 최신 타임아웃 값 가져오기
+      const currentTimeout = optionContext.get()?.currentTimeout || timeout;
+
+      // 액션 기록
+      recordWaitAction(
+          recorder,
+          WAIT_STATE.NETWORK,
+          urlPatternInput.value,
+          currentTimeout
       );
 
-      // 코드 컨테이너 추가
-      const codeContainer = doc.createElement('div');
-      codeContainer.style.marginBottom = '16px';
+      // 버튼 상태 복구
+      setTimeout(() => {
+        useButton.textContent = '사용하기';
+        useButton.style.backgroundColor = COMPONENT_STYLES.COPY_BUTTON.backgroundColor;
+      }, 2000);
+    });
 
-      const codeExample = doc.createElement('pre');
-      codeExample.style.backgroundColor = CODE_DISPLAY_STYLE.backgroundColor;
-      codeExample.style.color = CODE_DISPLAY_STYLE.color;
-      codeExample.style.padding = CODE_DISPLAY_STYLE.padding;
-      codeExample.style.borderRadius = CODE_DISPLAY_STYLE.borderRadius;
-      codeExample.style.overflowX = CODE_DISPLAY_STYLE.overflowX;
-      codeExample.style.whiteSpace = CODE_DISPLAY_STYLE.whiteSpace;
-      codeExample.textContent = navCode;
+    buttonContainer.appendChild(useButton);
+    section.appendChild(buttonContainer);
 
-      codeContainer.appendChild(codeExample);
-      navigationContent.appendChild(codeContainer);
+    // URL 패턴 변경 시 상태 업데이트
+    urlPatternInput.addEventListener('input', () => {
+      networkUrlPattern = urlPatternInput.value;
+      updateCodeBlockForCurrentState(currentTimeout);
+    });
 
-      // 사용하기 버튼 추가
-      const navBtnContainer = doc.createElement('div');
-      navBtnContainer.style.display = 'flex';
-      navBtnContainer.style.justifyContent = 'center';
-      navBtnContainer.style.marginTop = '16px';
-
-      const navBtn = doc.createElement('button');
-      navBtn.textContent = '사용하기';
-      navBtn.style.padding = '8px 16px';
-      navBtn.style.backgroundColor = '#3b82f6';
-      navBtn.style.color = '#ffffff';
-      navBtn.style.border = 'none';
-      navBtn.style.borderRadius = '6px';
-      navBtn.style.fontWeight = '500';
-      navBtn.style.cursor = 'pointer';
-      navBtn.style.fontSize = '14px';
-      navBtn.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
-
-      navBtn.addEventListener('click', () => {
-        try {
-          // recordWaitAction 함수 사용 - URL 값과 waitUntil 값 전달
-          recordWaitAction(
-              _injectedRecorder,
-              WAIT_STATE.NAVIGATION,
-              urlInput.value,
-              options.currentTimeout || 5000,
-              waitUntilSelect.value
-          );
-
-          // 버튼 상태 변경
-          navBtn.textContent = '추가됨 ✓';
-          navBtn.style.backgroundColor = '#10b981';
-
-          // 원래 상태로 복구
-          setTimeout(() => {
-            navBtn.textContent = '사용하기';
-            navBtn.style.backgroundColor = '#3b82f6';
-          }, 2000);
-        } catch (e) {
-          // 에러 발생 시 조용히 처리
-        }
-      });
-
-      navBtnContainer.appendChild(navBtn);
-      navigationContent.appendChild(navBtnContainer);
-      options.container.appendChild(navigationContent);
-      break;
-    case WAIT_STATE.NETWORK:
-      // 네트워크 요청 대기 기능 구현
-      const networkContent = doc.createElement('div');
-      networkContent.style.padding = '16px';
-      networkContent.style.backgroundColor = '#f0f9ff';
-      networkContent.style.borderRadius = '8px';
-      networkContent.style.border = '1px solid #bae6fd';
-
-      const netCode = generateTestCode('', options.currentTimeout || 5000, WAIT_STATE.NETWORK);
-
-      networkContent.innerHTML = `
-        <h3 style="margin-top: 0; font-size: 16px; color: #0c4a6e;">API 요청 대기</h3>
-        <p style="margin-bottom: 16px; font-size: 14px; color: #334155;">
-          특정 API 요청이 완료될 때까지 대기합니다.
-        </p>
-        <pre style="background-color: ${CODE_DISPLAY_STYLE.backgroundColor}; color: ${CODE_DISPLAY_STYLE.color}; padding: ${CODE_DISPLAY_STYLE.padding}; border-radius: ${CODE_DISPLAY_STYLE.borderRadius}; overflow-x: ${CODE_DISPLAY_STYLE.overflowX}; white-space: ${CODE_DISPLAY_STYLE.whiteSpace};">${netCode}</pre>
-      `;
-
-      // 사용하기 버튼 추가
-      const netBtnContainer = doc.createElement('div');
-      netBtnContainer.style.display = 'flex';
-      netBtnContainer.style.justifyContent = 'center';
-      netBtnContainer.style.marginTop = '16px';
-
-      const netBtn = doc.createElement('button');
-      netBtn.textContent = '사용하기';
-      netBtn.style.padding = '8px 16px';
-      netBtn.style.backgroundColor = '#3b82f6';
-      netBtn.style.color = '#ffffff';
-      netBtn.style.border = 'none';
-      netBtn.style.borderRadius = '6px';
-      netBtn.style.fontWeight = '500';
-      netBtn.style.cursor = 'pointer';
-      netBtn.style.fontSize = '14px';
-      netBtn.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
-
-      netBtn.addEventListener('click', () => {
-        try {
-          // recordWaitAction 함수 사용 - 옵션 전달
-          recordWaitAction(
-              _injectedRecorder,
-              WAIT_STATE.NETWORK,
-              '',
-              options.currentTimeout || 5000
-          );
-
-          // 버튼 상태 변경
-          netBtn.textContent = '추가됨 ✓';
-          netBtn.style.backgroundColor = '#10b981';
-
-          // 원래 상태로 복구
-          setTimeout(() => {
-            netBtn.textContent = '사용하기';
-            netBtn.style.backgroundColor = '#3b82f6';
-          }, 2000);
-        } catch (e) {
-          // 에러 발생 시 조용히 처리
-        }
-      });
-
-      netBtnContainer.appendChild(netBtn);
-      networkContent.appendChild(netBtnContainer);
-      options.container.appendChild(networkContent);
-      break;
-    case WAIT_STATE.TIMEOUT:
-      // 시간 지연 대기 기능 구현
-      const timeoutContent = doc.createElement('div');
-      timeoutContent.style.padding = '16px';
-      timeoutContent.style.backgroundColor = '#f0f9ff';
-      timeoutContent.style.borderRadius = '8px';
-      timeoutContent.style.border = '1px solid #bae6fd';
-
-      const timeoutCode = generateTestCode('', options.currentTimeout || 5000, WAIT_STATE.TIMEOUT);
-
-      timeoutContent.innerHTML = `
-        <h3 style="margin-top: 0; font-size: 16px; color: #0c4a6e;">시간 지연 대기</h3>
-        <p style="margin-bottom: 16px; font-size: 14px; color: #334155;">
-          지정된 시간(밀리초)동안 실행을 지연합니다.
-        </p>
-        <pre style="background-color: ${CODE_DISPLAY_STYLE.backgroundColor}; color: ${CODE_DISPLAY_STYLE.color}; padding: ${CODE_DISPLAY_STYLE.padding}; border-radius: ${CODE_DISPLAY_STYLE.borderRadius}; overflow-x: ${CODE_DISPLAY_STYLE.overflowX}; white-space: ${CODE_DISPLAY_STYLE.whiteSpace};">${timeoutCode}</pre>
-      `;
-
-      // 사용하기 버튼 추가
-      const timeoutBtnContainer = doc.createElement('div');
-      timeoutBtnContainer.style.display = 'flex';
-      timeoutBtnContainer.style.justifyContent = 'center';
-      timeoutBtnContainer.style.marginTop = '16px';
-
-      const timeoutBtn = doc.createElement('button');
-      timeoutBtn.textContent = '사용하기';
-      timeoutBtn.style.padding = '8px 16px';
-      timeoutBtn.style.backgroundColor = '#3b82f6';
-      timeoutBtn.style.color = '#ffffff';
-      timeoutBtn.style.border = 'none';
-      timeoutBtn.style.borderRadius = '6px';
-      timeoutBtn.style.fontWeight = '500';
-      timeoutBtn.style.cursor = 'pointer';
-      timeoutBtn.style.fontSize = '14px';
-      timeoutBtn.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
-
-      timeoutBtn.addEventListener('click', () => {
-        try {
-          // recordWaitAction 함수 사용 - 옵션 전달
-          recordWaitAction(
-              _injectedRecorder,
-              WAIT_STATE.TIMEOUT,
-              '',
-              options.currentTimeout || 5000
-          );
-
-          // 버튼 상태 변경
-          timeoutBtn.textContent = '추가됨 ✓';
-          timeoutBtn.style.backgroundColor = '#10b981';
-
-          // 원래 상태로 복구
-          setTimeout(() => {
-            timeoutBtn.textContent = '사용하기';
-            timeoutBtn.style.backgroundColor = '#3b82f6';
-          }, 2000);
-        } catch (e) {
-          // 에러 발생 시 조용히 처리
-        }
-      });
-
-      timeoutBtnContainer.appendChild(timeoutBtn);
-      timeoutContent.appendChild(timeoutBtnContainer);
-      options.container.appendChild(timeoutContent);
-      break;
-    case WAIT_STATE.PAGE_LOAD:
-      // 페이지 로드 대기 기능 구현
-      const pageLoadContent = doc.createElement('div');
-      pageLoadContent.style.padding = '16px';
-      pageLoadContent.style.backgroundColor = '#f0f9ff';
-      pageLoadContent.style.borderRadius = '8px';
-      pageLoadContent.style.border = '1px solid #bae6fd';
-
-      const pageLoadCode = generateTestCode('', options.currentTimeout || 5000, WAIT_STATE.PAGE_LOAD);
-
-      pageLoadContent.innerHTML = `
-        <h3 style="margin-top: 0; font-size: 16px; color: #0c4a6e;">페이지 로드 대기</h3>
-        <p style="margin-bottom: 16px; font-size: 14px; color: #334155;">
-          페이지 로드 상태가 완료될 때까지 대기합니다.
-        </p>
-        <pre style="background-color: ${CODE_DISPLAY_STYLE.backgroundColor}; color: ${CODE_DISPLAY_STYLE.color}; padding: ${CODE_DISPLAY_STYLE.padding}; border-radius: ${CODE_DISPLAY_STYLE.borderRadius}; overflow-x: ${CODE_DISPLAY_STYLE.overflowX}; white-space: ${CODE_DISPLAY_STYLE.whiteSpace};">${pageLoadCode}</pre>
-      `;
-
-      // 사용하기 버튼 추가
-      const pageLoadBtnContainer = doc.createElement('div');
-      pageLoadBtnContainer.style.display = 'flex';
-      pageLoadBtnContainer.style.justifyContent = 'center';
-      pageLoadBtnContainer.style.marginTop = '16px';
-
-      const pageLoadBtn = doc.createElement('button');
-      pageLoadBtn.textContent = '사용하기';
-      pageLoadBtn.style.padding = '8px 16px';
-      pageLoadBtn.style.backgroundColor = '#3b82f6';
-      pageLoadBtn.style.color = '#ffffff';
-      pageLoadBtn.style.border = 'none';
-      pageLoadBtn.style.borderRadius = '6px';
-      pageLoadBtn.style.fontWeight = '500';
-      pageLoadBtn.style.cursor = 'pointer';
-      pageLoadBtn.style.fontSize = '14px';
-      pageLoadBtn.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
-
-      pageLoadBtn.addEventListener('click', () => {
-        try {
-          // recordWaitAction 함수 사용 - 옵션 전달
-          recordWaitAction(
-              _injectedRecorder,
-              WAIT_STATE.PAGE_LOAD,
-              '',
-              options.currentTimeout || 5000
-          );
-
-          // 버튼 상태 변경
-          pageLoadBtn.textContent = '추가됨 ✓';
-          pageLoadBtn.style.backgroundColor = '#10b981';
-
-          // 원래 상태로 복구
-          setTimeout(() => {
-            pageLoadBtn.textContent = '사용하기';
-            pageLoadBtn.style.backgroundColor = '#3b82f6';
-          }, 2000);
-        } catch (e) {
-          // 에러 발생 시 조용히 처리
-        }
-      });
-
-      pageLoadBtnContainer.appendChild(pageLoadBtn);
-      pageLoadContent.appendChild(pageLoadBtnContainer);
-      options.container.appendChild(pageLoadContent);
-      break;
-    default:
-      break;
+    container.appendChild(section);
   }
+
+  /**
+   * 타임아웃 대기 섹션 생성
+   */
+  function createTimeoutWaitSection(container: HTMLElement, timeout: number, recorder: Recorder): void {
+    const injectedScript = recorder.injectedScript;
+    const doc = injectedScript.document;
+
+    // 섹션 생성
+    const section = doc.createElement('div');
+    applyStyles(section, SECTION_STYLES.CONTAINER);
+
+    // 헤더
+    const header = doc.createElement('h3');
+    applyStyles(header, SECTION_STYLES.HEADER);
+    header.textContent = '시간 지연 대기';
+    section.appendChild(header);
+
+    // 설명
+    const description = doc.createElement('p');
+    applyStyles(description, SECTION_STYLES.DESCRIPTION);
+    description.textContent = '지정된 시간(밀리초)만큼 실행을 일시 중지합니다. 좌측에서 시간을 조정할 수 있습니다.';
+    section.appendChild(description);
+
+    // 코드 블록 생성
+    const codeContainer = doc.createElement('div');
+    applyStyles(codeContainer, SECTION_STYLES.CODE_CONTAINER);
+
+    // 코드 헤더
+    const codeHeader = doc.createElement('p');
+    applyStyles(codeHeader, COMPONENT_STYLES.CODE_HEADING);
+    codeHeader.textContent = '생성될 테스트 코드';
+    codeContainer.appendChild(codeHeader);
+
+    // 코드 미리보기
+    const codeBlock = doc.createElement('pre');
+    applyStyles(codeBlock, COMPONENT_STYLES.CODE_BLOCK);
+
+    // 코드 생성 및 표시
+    codeBlock.textContent = `await page.waitForTimeout(${timeout});`;
+
+    // 코드 블록 참조 저장
+    codeBlockElements[WAIT_STATE.TIMEOUT] = codeBlock;
+
+    codeContainer.appendChild(codeBlock);
+
+    // 코드 설명
+    const codeDescription = doc.createElement('p');
+    applyStyles(codeDescription, COMPONENT_STYLES.CODE_DESCRIPTION);
+    codeDescription.textContent = '주의: 시간 지연은 안정적인 테스트 방법이 아닙니다. 가능하면 요소나 상태 기반 대기를 사용하세요.';
+    codeContainer.appendChild(codeDescription);
+
+    section.appendChild(codeContainer);
+
+    // 사용 버튼 컨테이너
+    const buttonContainer = doc.createElement('div');
+    applyStyles(buttonContainer, SECTION_STYLES.BUTTON_CONTAINER);
+
+    // 사용 버튼
+    const useButton = doc.createElement('button');
+    applyStyles(useButton, COMPONENT_STYLES.COPY_BUTTON);
+    useButton.textContent = '사용하기';
+
+    useButton.addEventListener('click', () => {
+      // 버튼 상태 변경
+      useButton.textContent = '추가됨 ✓';
+      useButton.style.backgroundColor = COMPONENT_STYLES.SUCCESS_BUTTON.backgroundColor;
+
+      // 최신 타임아웃 값 가져오기
+      const currentTimeout = optionContext.get()?.currentTimeout || timeout;
+
+      // 액션 기록
+      recordWaitAction(
+          recorder,
+          WAIT_STATE.TIMEOUT,
+          '',
+          currentTimeout
+      );
+
+      // 버튼 상태 복구
+      setTimeout(() => {
+        useButton.textContent = '사용하기';
+        useButton.style.backgroundColor = COMPONENT_STYLES.COPY_BUTTON.backgroundColor;
+      }, 2000);
+    });
+
+    buttonContainer.appendChild(useButton);
+    section.appendChild(buttonContainer);
+
+    container.appendChild(section);
+  }
+
+  /**
+   * 페이지 로드 대기 섹션 생성
+   */
+  function createPageLoadWaitSection(container: HTMLElement, timeout: number, recorder: Recorder): void {
+    const injectedScript = recorder.injectedScript;
+    const doc = injectedScript.document;
+
+    // 섹션 생성
+    const section = doc.createElement('div');
+    applyStyles(section, SECTION_STYLES.CONTAINER);
+
+    // 헤더
+    const header = doc.createElement('h3');
+    applyStyles(header, SECTION_STYLES.HEADER);
+    header.textContent = '페이지 로드 대기';
+    section.appendChild(header);
+
+    // 설명
+    const description = doc.createElement('p');
+    applyStyles(description, SECTION_STYLES.DESCRIPTION);
+    description.textContent = '페이지 로드 상태까지 대기합니다. 페이지 이동 후 자동으로 대기하고 싶을 때 사용하세요.';
+    section.appendChild(description);
+
+    // 코드 블록 생성
+    const codeContainer = doc.createElement('div');
+    applyStyles(codeContainer, SECTION_STYLES.CODE_CONTAINER);
+
+    // 코드 헤더
+    const codeHeader = doc.createElement('p');
+    applyStyles(codeHeader, COMPONENT_STYLES.CODE_HEADING);
+    codeHeader.textContent = '생성될 테스트 코드';
+    codeContainer.appendChild(codeHeader);
+
+    // 코드 미리보기
+    const codeBlock = doc.createElement('pre');
+    applyStyles(codeBlock, COMPONENT_STYLES.CODE_BLOCK);
+
+    // 코드 생성 및 표시
+    codeBlock.textContent = `await page.waitForLoadState('load', { timeout: ${timeout} });`;
+
+    // 코드 블록 참조 저장
+    codeBlockElements[WAIT_STATE.PAGE_LOAD] = codeBlock;
+
+    codeContainer.appendChild(codeBlock);
+    section.appendChild(codeContainer);
+
+    // 사용 버튼 컨테이너
+    const buttonContainer = doc.createElement('div');
+    applyStyles(buttonContainer, SECTION_STYLES.BUTTON_CONTAINER);
+
+    // 사용 버튼
+    const useButton = doc.createElement('button');
+    applyStyles(useButton, COMPONENT_STYLES.COPY_BUTTON);
+    useButton.textContent = '사용하기';
+
+    useButton.addEventListener('click', () => {
+      // 버튼 상태 변경
+      useButton.textContent = '추가됨 ✓';
+      useButton.style.backgroundColor = COMPONENT_STYLES.SUCCESS_BUTTON.backgroundColor;
+
+      // 최신 타임아웃 값 가져오기
+      const currentTimeout = optionContext.get()?.currentTimeout || timeout;
+
+      // 액션 기록
+      recordWaitAction(
+          recorder,
+          WAIT_STATE.PAGE_LOAD,
+          '',
+          currentTimeout
+      );
+
+      // 버튼 상태 복구
+      setTimeout(() => {
+        useButton.textContent = '사용하기';
+        useButton.style.backgroundColor = COMPONENT_STYLES.COPY_BUTTON.backgroundColor;
+      }, 2000);
+    });
+
+    buttonContainer.appendChild(useButton);
+    section.appendChild(buttonContainer);
+
+    container.appendChild(section);
+  }
+
+  return container;
 }
