@@ -374,8 +374,9 @@ function createTimeoutSection(document: Document, activeTimeout: number): HTMLDi
   const timeoutInput = document.createElement('input');
   timeoutInput.type = 'number';
   timeoutInput.value = String(activeTimeout);
-  timeoutInput.min = '100';
+  timeoutInput.min = '0';
   timeoutInput.step = '500';
+  timeoutInput.placeholder = '0 = 사용 안함';
   applyStyles(timeoutInput, TIMEOUT_STYLES.TIME_INPUT);
   inputGroup.appendChild(timeoutInput);
   inputContainer.appendChild(inputGroup);
@@ -383,7 +384,7 @@ function createTimeoutSection(document: Document, activeTimeout: number): HTMLDi
   // 타임아웃 변경 이벤트 처리
   timeoutInput.addEventListener('input', () => {
     const newTimeout = parseInt(timeoutInput.value, 10);
-    if (!isNaN(newTimeout) && newTimeout >= 100 && optionContext.value?.onTimeoutChange) {
+    if (!isNaN(newTimeout) && (newTimeout === 0 || newTimeout >= 100) && optionContext.value?.onTimeoutChange) {
       optionContext.value.onTimeoutChange(newTimeout);
 
       // 빠른 선택 버튼 상태 업데이트
@@ -397,9 +398,14 @@ function createTimeoutSection(document: Document, activeTimeout: number): HTMLDi
       if (matchedPreset) {
         const index = TIMEOUT_PRESETS.indexOf(matchedPreset);
         const button = allButtons[index];
-        if (button)
-          applyStyles(button, TIMEOUT_STYLES.QUICK_BUTTON_SELECTED);
-
+        if (button) {
+          if (matchedPreset.value === 0) {
+            // "사용 안함" 버튼 스타일
+            applyStyles(button, TIMEOUT_STYLES.QUICK_BUTTON_DISABLED_SELECTED);
+          } else {
+            applyStyles(button, TIMEOUT_STYLES.QUICK_BUTTON_SELECTED);
+          }
+        }
       }
     }
   });
@@ -409,13 +415,25 @@ function createTimeoutSection(document: Document, activeTimeout: number): HTMLDi
   applyStyles(quickButtonsContainer, TIMEOUT_STYLES.QUICK_BUTTONS_CONTAINER);
 
   // 빠른 버튼 생성
-  TIMEOUT_PRESETS.forEach(preset => {
+  TIMEOUT_PRESETS.forEach((preset, index) => {
     const button = document.createElement('button');
     button.textContent = preset.label;
     applyStyles(button, TIMEOUT_STYLES.QUICK_BUTTON);
 
-    if (activeTimeout === preset.value)
-      applyStyles(button, TIMEOUT_STYLES.QUICK_BUTTON_SELECTED);
+    // "사용 안함" 버튼(마지막 버튼)에 왼쪽 마진 추가
+    if (preset.value === 0)
+      button.style.marginLeft = '8px';
+
+
+    // 현재 값과 일치하면 선택된 스타일 적용
+    if (activeTimeout === preset.value) {
+      if (preset.value === 0) {
+        // "사용 안함" 버튼 스타일
+        applyStyles(button, TIMEOUT_STYLES.QUICK_BUTTON_DISABLED_SELECTED);
+      } else {
+        applyStyles(button, TIMEOUT_STYLES.QUICK_BUTTON_SELECTED);
+      }
+    }
 
     // 버튼 클릭 이벤트 처리
     button.addEventListener('click', () => {
@@ -429,7 +447,12 @@ function createTimeoutSection(document: Document, activeTimeout: number): HTMLDi
       });
 
       // 선택된 버튼 스타일 적용
-      applyStyles(button, TIMEOUT_STYLES.QUICK_BUTTON_SELECTED);
+      if (preset.value === 0) {
+        // "사용 안함" 버튼 스타일
+        applyStyles(button, TIMEOUT_STYLES.QUICK_BUTTON_DISABLED_SELECTED);
+      } else {
+        applyStyles(button, TIMEOUT_STYLES.QUICK_BUTTON_SELECTED);
+      }
 
       // 컨텍스트에 타임아웃 값 업데이트
       if (optionContext.value?.onTimeoutChange)
@@ -446,7 +469,7 @@ function createTimeoutSection(document: Document, activeTimeout: number): HTMLDi
   // 도움말 텍스트
   const helpText = document.createElement('div');
   applyStyles(helpText, TIMEOUT_STYLES.HELP_TEXT);
-  helpText.textContent = '일반적으로 5-30초(5000-30000 밀리초) 사이의 값을 권장합니다.';
+  helpText.textContent = '"사용 안함"을 선택하면 timeout 옵션이 제외됩니다. 권장: 5-30초';
   timeoutSection.appendChild(helpText);
 
   return timeoutSection;

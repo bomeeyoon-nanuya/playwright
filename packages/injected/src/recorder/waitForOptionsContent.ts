@@ -110,31 +110,55 @@ export function createWaitOptionsContent(params: CreateWaitOptionsContentParams)
 
     switch (activeWaitState) {
       case WAIT_STATE.ELEMENT:
-        if (selectedElementSelector)
-          code = generateTestCode(selectedElementSelector, timeout, WAIT_STATE.ELEMENT);
+        if (selectedElementSelector) {
+          if (timeout > 0)
+            code = generateTestCode(selectedElementSelector, timeout, WAIT_STATE.ELEMENT);
+          else
+            code = `await page.waitForSelector('${selectedElementSelector}', { state: 'visible' });`;
 
+        }
         break;
 
       case WAIT_STATE.REMOVED:
-        if (selectedRemovedSelector)
-          code = generateTestCode(selectedRemovedSelector, timeout, WAIT_STATE.REMOVED);
+        if (selectedRemovedSelector) {
+          if (timeout > 0)
+            code = generateTestCode(selectedRemovedSelector, timeout, WAIT_STATE.REMOVED);
+          else
+            code = `await page.waitForSelector('${selectedRemovedSelector}', { state: 'hidden' });`;
 
+        }
         break;
 
       case WAIT_STATE.NAVIGATION:
-        code = generateTestCode(navigationUrl, timeout, WAIT_STATE.NAVIGATION, navigationWaitUntil);
+        if (timeout > 0) {
+          code = generateTestCode(navigationUrl, timeout, WAIT_STATE.NAVIGATION, navigationWaitUntil);
+        } else {
+          if (navigationUrl && navigationUrl.trim() !== '')
+            code = `await page.waitForNavigation({ url: '${navigationUrl}', waitUntil: '${navigationWaitUntil}' });`;
+          else
+            code = `await page.waitForNavigation({ waitUntil: '${navigationWaitUntil}' });`;
+
+        }
         break;
 
       case WAIT_STATE.NETWORK:
-        code = `await page.waitForResponse(response => response.url().includes('${networkUrlPattern}'), { timeout: ${timeout} });`;
+        if (timeout > 0)
+          code = `await page.waitForResponse(response => response.url().includes('${networkUrlPattern}'), { timeout: ${timeout} });`;
+        else
+          code = `await page.waitForResponse(response => response.url().includes('${networkUrlPattern}'));`;
+
         break;
 
       case WAIT_STATE.TIMEOUT:
-        code = `await page.waitForTimeout(${timeout});`;
+        code = `await page.waitForTimeout(${timeout || 1000});`;
         break;
 
       case WAIT_STATE.PAGE_LOAD:
-        code = `await page.waitForLoadState('load', { timeout: ${timeout} });`;
+        if (timeout > 0)
+          code = `await page.waitForLoadState('load', { timeout: ${timeout} });`;
+        else
+          code = `await page.waitForLoadState('load');`;
+
         break;
     }
 
@@ -268,7 +292,8 @@ export function createWaitOptionsContent(params: CreateWaitOptionsContentParams)
             section.removeChild(previousResult);
 
           // 최신 타임아웃 값 가져오기
-          const currentTimeout = optionContext.get()?.currentTimeout || timeout;
+          const contextTimeout = optionContext.get()?.currentTimeout;
+          const currentTimeout = contextTimeout !== undefined ? contextTimeout : timeout;
 
           // 새 결과 추가
           const resultElement = createSelectedElementResult(
@@ -342,7 +367,8 @@ export function createWaitOptionsContent(params: CreateWaitOptionsContentParams)
             section.removeChild(previousResult);
 
           // 최신 타임아웃 값 가져오기
-          const currentTimeout = optionContext.get()?.currentTimeout || timeout;
+          const contextTimeout = optionContext.get()?.currentTimeout;
+          const currentTimeout = contextTimeout !== undefined ? contextTimeout : timeout;
 
           // 새 결과 추가
           const resultElement = createSelectedElementResult(
@@ -492,7 +518,8 @@ export function createWaitOptionsContent(params: CreateWaitOptionsContentParams)
       useButton.style.backgroundColor = COMPONENT_STYLES.SUCCESS_BUTTON.backgroundColor;
 
       // 최신 타임아웃 값 가져오기
-      const currentTimeout = optionContext.get()?.currentTimeout || timeout;
+      const contextTimeout = optionContext.get()?.currentTimeout;
+      const currentTimeout = contextTimeout !== undefined ? contextTimeout : timeout;
 
       // 액션 기록
       recordWaitAction(
@@ -608,7 +635,8 @@ export function createWaitOptionsContent(params: CreateWaitOptionsContentParams)
       useButton.style.backgroundColor = COMPONENT_STYLES.SUCCESS_BUTTON.backgroundColor;
 
       // 최신 타임아웃 값 가져오기
-      const currentTimeout = optionContext.get()?.currentTimeout || timeout;
+      const contextTimeout = optionContext.get()?.currentTimeout;
+      const currentTimeout = contextTimeout !== undefined ? contextTimeout : timeout;
 
       // 액션 기록
       recordWaitAction(
@@ -705,7 +733,8 @@ export function createWaitOptionsContent(params: CreateWaitOptionsContentParams)
       useButton.style.backgroundColor = COMPONENT_STYLES.SUCCESS_BUTTON.backgroundColor;
 
       // 최신 타임아웃 값 가져오기
-      const currentTimeout = optionContext.get()?.currentTimeout || timeout;
+      const contextTimeout = optionContext.get()?.currentTimeout;
+      const currentTimeout = contextTimeout !== undefined ? contextTimeout : timeout;
 
       // 액션 기록
       recordWaitAction(
@@ -789,7 +818,8 @@ export function createWaitOptionsContent(params: CreateWaitOptionsContentParams)
       useButton.style.backgroundColor = COMPONENT_STYLES.SUCCESS_BUTTON.backgroundColor;
 
       // 최신 타임아웃 값 가져오기
-      const currentTimeout = optionContext.get()?.currentTimeout || timeout;
+      const contextTimeout = optionContext.get()?.currentTimeout;
+      const currentTimeout = contextTimeout !== undefined ? contextTimeout : timeout;
 
       // 액션 기록
       recordWaitAction(

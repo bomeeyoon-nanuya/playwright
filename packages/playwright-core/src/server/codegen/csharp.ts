@@ -172,6 +172,27 @@ export class CSharpLanguageGenerator implements LanguageGenerator {
         const optionsString = formatObject(options, '    ', 'LoadStateOptions');
         return `await ${subject}.WaitForLoadStateAsync(${optionsString});`;
       }
+      case 'waitForResponse': {
+        const options = action.options || {};
+        const optionsString = Object.keys(options).length ?
+          `, new PageWaitForResponseOptions { ${Object.entries(options).map(([key, value]) => `${toPascal(key)} = ${typeof value === 'string' ? quote(value) : value}`).join(', ')} }` :
+          '';
+
+        if (action.predicateText) {
+          // predicate 함수만 있는 경우 - 여러 줄로 formatting
+          const csharpPredicate = action.predicateText
+              .replace('response', 'res')
+              .replace('=>', '=>')
+              .replace('===', '==')
+              .replace('!==', '!=');
+          return `await ${subject}.WaitForResponseAsync(res =>
+    ${csharpPredicate}${optionsString});`;
+        } else {
+          // URL 패턴만 있는 경우
+          const urlPattern = action.url || '**/api/**';
+          return `await ${subject}.WaitForResponseAsync(${quote(urlPattern)}${optionsString});`;
+        }
+      }
     }
 
     return `// 알 수 없는 액션: ${action.name}`;

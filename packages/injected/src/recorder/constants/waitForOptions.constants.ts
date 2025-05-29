@@ -43,7 +43,8 @@ export const TIMEOUT_PRESETS = [
   { value: 3000, label: '3초' },
   { value: 5000, label: '5초' },
   { value: 10000, label: '10초' },
-  { value: 30000, label: '30초' }
+  { value: 30000, label: '30초' },
+  { value: 0, label: '사용 안함' }
 ];
 
 /**

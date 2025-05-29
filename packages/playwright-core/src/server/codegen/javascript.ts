@@ -167,6 +167,21 @@ ${pageAlias}.once('dialog', async dialog => {
         const optionsString = formatOptions(options, false);
         return `await ${subject}.waitForNavigation(${optionsString});`;
       }
+      case 'waitForResponse': {
+        const options = action.options || {};
+
+        // URL이 필수값 - 없으면 코드 생성하지 않음
+        if (!action.url)
+          return '';
+
+
+        // timeout이 있는지 확인하고 한 줄로 생성
+        if (options.timeout)
+          return `await ${subject}.waitForResponse(response => response.url().includes('${action.url}'), { timeout: ${options.timeout} });`;
+        else
+          return `await ${subject}.waitForResponse(response => response.url().includes('${action.url}'));`;
+
+      }
     }
     return `// 알 수 없는 액션: ${action.name}`;
   }

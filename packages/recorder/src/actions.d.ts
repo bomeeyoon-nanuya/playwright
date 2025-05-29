@@ -161,6 +161,7 @@ export type WaitForLoadStateAction = ActionBase & {
 export type WaitForResponseAction = ActionBase & {
   name: 'waitForResponse',
   url: string,
+  predicateText?: string,
   options?: {
     timeout?: number
   }

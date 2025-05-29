@@ -146,7 +146,7 @@ export function recordWaitAction(
   recorder: Recorder,
   waitState: WaitState,
   selector: string,
-  timeout: number,
+  timeout?: number,
   waitUntil: string = 'networkidle'
 ): void {
   if (!recorder)
@@ -156,6 +156,9 @@ export function recordWaitAction(
     // 인스펙터에서 인식 가능한 표준 액션 형식으로 변환
     let action: any;
 
+    // timeout이 유효한지 확인 (0이거나 undefined면 timeout 사용 안함)
+    const shouldIncludeTimeout = timeout !== undefined && timeout > 0;
+
     switch (waitState) {
       case WAIT_STATE.ELEMENT:
         action = {
@@ -163,7 +166,7 @@ export function recordWaitAction(
           selector: selector || 'body',
           options: {
             state: 'visible',
-            timeout
+            ...(shouldIncludeTimeout && { timeout })
           },
           signals: []
         };
@@ -174,7 +177,7 @@ export function recordWaitAction(
           selector: selector || 'body',
           options: {
             state: 'hidden',
-            timeout
+            ...(shouldIncludeTimeout && { timeout })
           },
           signals: []
         };
@@ -183,8 +186,8 @@ export function recordWaitAction(
         action = {
           name: 'waitForNavigation',
           options: {
-            timeout,
-            waitUntil
+            waitUntil,
+            ...(shouldIncludeTimeout && { timeout })
           },
           signals: []
         };
@@ -197,19 +200,16 @@ export function recordWaitAction(
       case WAIT_STATE.NETWORK:
         action = {
           name: 'waitForResponse',
-          url: '**/api/**',
-          options: {
-            timeout
-          },
-          signals: [],
-          predicateText: "response => response.url().includes('/api')"
+          url: selector || '/api',
+          options: shouldIncludeTimeout ? { timeout } : {},
+          signals: []
         };
         break;
       case WAIT_STATE.TIMEOUT:
         action = {
           name: 'waitForTimeout',
           options: {
-            timeout
+            timeout: timeout || 1000  // waitForTimeout의 경우 timeout은 필수
           },
           signals: []
         };
@@ -218,8 +218,8 @@ export function recordWaitAction(
         action = {
           name: 'waitForLoadState',
           options: {
-            timeout,
-            state: 'load'
+            state: 'load',
+            ...(shouldIncludeTimeout && { timeout })
           },
           signals: []
         };
@@ -231,7 +231,7 @@ export function recordWaitAction(
           selector: selector || 'body',
           options: {
             state: 'visible',
-            timeout
+            ...(shouldIncludeTimeout && { timeout })
           },
           signals: []
         };

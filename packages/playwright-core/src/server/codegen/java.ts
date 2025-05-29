@@ -160,6 +160,53 @@ ${pageAlias}.onceDialog(dialog -> {
       }
       case 'assertSnapshot':
         return `assertThat(${subject}.${this._asLocator(action.selector, inFrameLocator)}).matchesAriaSnapshot(${quote(action.snapshot)});`;
+      case 'waitForSelector': {
+        const options = action.options || {};
+        const optionsArgs = Object.keys(options).length ?
+          `, new Locator.WaitForOptions()${Object.entries(options).map(([key, value]) => `.set${key.charAt(0).toUpperCase() + key.slice(1)}(${typeof value === 'string' ? quote(value) : value})`).join('')}` :
+          '';
+        return `${subject}.waitForSelector(${this._asLocator(action.selector, inFrameLocator)}${optionsArgs});`;
+      }
+      case 'waitForTimeout': {
+        const timeout = action.options?.timeout ?? 0;
+        return `${subject}.waitForTimeout(${timeout});`;
+      }
+      case 'waitForLoadState': {
+        const options = action.options || {};
+        const state = action.state ? `LoadState.${action.state.toUpperCase()}` : 'LoadState.LOAD';
+        const optionsArgs = Object.keys(options).length ?
+          `, new Page.WaitForLoadStateOptions()${Object.entries(options).map(([key, value]) => `.set${key.charAt(0).toUpperCase() + key.slice(1)}(${typeof value === 'string' ? quote(value) : value})`).join('')}` :
+          '';
+        return `${subject}.waitForLoadState(${state}${optionsArgs});`;
+      }
+      case 'waitForNavigation': {
+        const options = action.options || {};
+        const optionsArgs = Object.keys(options).length ?
+          `new Page.WaitForNavigationOptions()${Object.entries(options).map(([key, value]) => `.set${key.charAt(0).toUpperCase() + key.slice(1)}(${typeof value === 'string' ? quote(value) : value})`).join('')}` :
+          '';
+        return `${subject}.waitForNavigation(${optionsArgs});`;
+      }
+      case 'waitForResponse': {
+        const options = action.options || {};
+        const optionsArgs = Object.keys(options).length ?
+          `, new Page.WaitForResponseOptions()${Object.entries(options).map(([key, value]) => `.set${key.charAt(0).toUpperCase() + key.slice(1)}(${typeof value === 'string' ? quote(value) : value})`).join('')}` :
+          '';
+
+        if (action.predicateText) {
+          // predicate 함수만 있는 경우 - 여러 줄로 formatting
+          const javaPredicate = action.predicateText
+              .replace('response', 'res')
+              .replace('=>', '->')
+              .replace('===', '.equals')
+              .replace('!==', '!.equals');
+          return `${subject}.waitForResponse(res ->
+    ${javaPredicate}${optionsArgs});`;
+        } else {
+          // URL 패턴만 있는 경우
+          const urlPattern = action.url || '**/api/**';
+          return `${subject}.waitForResponse(${quote(urlPattern)}${optionsArgs});`;
+        }
+      }
     }
 
     // 기본 경우: 알 수 없는 액션

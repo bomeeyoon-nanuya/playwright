@@ -274,7 +274,8 @@ export const TIMEOUT_STYLES = {
   QUICK_BUTTONS_CONTAINER: {
     display: 'flex',
     marginTop: '8px',
-    gap: '8px'
+    gap: '6px',
+    flexWrap: 'wrap'
   },
   // 빠른 시간 버튼 (기본)
   QUICK_BUTTON: {
@@ -293,6 +294,13 @@ export const TIMEOUT_STYLES = {
     backgroundColor: '#e0edff',
     color: '#2563eb',
     fontWeight: '500'
+  },
+  // "사용 안함" 버튼 (선택됨)
+  QUICK_BUTTON_DISABLED_SELECTED: {
+    backgroundColor: '#f3f4f6',
+    color: '#6b7280',
+    fontWeight: '500',
+    border: '1px solid #d1d5db'
   },
   // 도움말 텍스트
   HELP_TEXT: {

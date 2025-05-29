@@ -129,7 +129,48 @@ export class PythonLanguageGenerator implements LanguageGenerator {
       }
       case 'assertSnapshot':
         return `expect(${subject}.${this._asLocator(action.selector)}).to_match_aria_snapshot(${quote(action.snapshot)})`;
+      case 'waitForSelector': {
+        const options = action.options || {};
+        const optionsString = formatOptions(options, false);
+        return `${subject}.wait_for_selector(${this._asLocator(action.selector)}${optionsString ? ', ' + optionsString : ''})`;
+      }
+      case 'waitForTimeout': {
+        const timeout = action.options?.timeout ?? 0;
+        return `${subject}.wait_for_timeout(${timeout})`;
+      }
+      case 'waitForLoadState': {
+        const options = action.options || {};
+        const state = action.state ? quote(action.state) : '"load"';
+        const optionsString = formatOptions(options, false);
+        return `${subject}.wait_for_load_state(${state}${optionsString ? ', ' + optionsString : ''})`;
+      }
+      case 'waitForNavigation': {
+        const options = action.options || {};
+        const optionsString = formatOptions(options, false);
+        return `${subject}.wait_for_navigation(${optionsString})`;
+      }
+      case 'waitForResponse': {
+        const options = action.options || {};
+        const optionsString = formatOptions(options, false);
+
+        if (action.predicateText) {
+          // predicate 함수만 있는 경우 - 여러 줄로 formatting
+          const optionsPart = optionsString ? `, ${optionsString}` : '';
+          const pythonPredicate = action.predicateText
+              .replace('response', 'res')
+              .replace('=>', ':')
+              .replace('===', '==')
+              .replace('!==', '!=');
+          return `${subject}.wait_for_response(lambda res${optionsPart}:
+    ${pythonPredicate})`;
+        } else {
+          // URL 패턴만 있는 경우
+          const urlPattern = action.url || '**/api/**';
+          return `${subject}.wait_for_response(${quote(urlPattern)}${optionsString ? ', ' + optionsString : ''})`;
+        }
+      }
     }
+    return `# 알 수 없는 액션: ${action.name}`;
   }
 
   private _asLocator(selector: string) {
