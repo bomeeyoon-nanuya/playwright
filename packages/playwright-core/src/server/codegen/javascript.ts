@@ -54,7 +54,7 @@ export class JavaScriptLanguageGenerator implements LanguageGenerator {
     const subject = `${pageAlias}${locators.join('')}`;
     const signals = toSignalMap(action);
 
-    if (signals.dialog) {
+    if (signals.dialog && !['alert', 'confirm', 'confirmResult'].includes(action.name)) {
       formatter.add(`  ${pageAlias}.once('dialog', dialog => {
     console.log(\`Dialog message: $\{dialog.message()}\`);
     dialog.dismiss().catch(() => {});
@@ -143,6 +143,15 @@ export class JavaScriptLanguageGenerator implements LanguageGenerator {
         const optionsString = formatOptions(options, false);
         return `await ${subject}.waitForNavigation(${optionsString});`;
       }
+      case 'alert':
+        return `// Alert detected: "${escapeWithQuotes(action.message, '\'')}"
+  page.on('dialog', dialog => dialog.accept());`;
+      case 'confirm':
+        return `// Confirm detected: "${escapeWithQuotes(action.message, '\'')}"`;
+      case 'confirmResult':
+        const dialogAction = action.result ? 'accept' : 'dismiss';
+        return `// User ${action.result ? 'accepted' : 'dismissed'} confirm: "${escapeWithQuotes(action.message, '\'')}"
+  page.on('dialog', dialog => dialog.${dialogAction}());`;
     }
     return `// 알 수 없는 액션: ${action.name}`;
   }

@@ -36,7 +36,10 @@ export type ActionName =
   'waitForNavigation' |
   'waitForTimeout' |
   'waitForLoadState' |
-  'waitForResponse';
+  'waitForResponse' |
+  'alert' |
+  'confirm' |
+  'confirmResult';
 
 export type ActionBase = {
   name: ActionName,
@@ -163,7 +166,23 @@ export type WaitForResponseAction = ActionBase & {
   }
 };
 
-export type Action = ClickAction | CheckAction | ClosesPageAction | OpenPageAction | UncheckAction | FillAction | NavigateAction | PressAction | SelectAction | SetInputFilesAction | AssertTextAction | AssertValueAction | AssertCheckedAction | AssertVisibleAction | AssertSnapshotAction | WaitForSelectorAction | WaitForNavigationAction | WaitForTimeoutAction | WaitForLoadStateAction | WaitForResponseAction;
+export type AlertAction = ActionBase & {
+  name: 'alert',
+  message: string,
+};
+
+export type ConfirmAction = ActionBase & {
+  name: 'confirm',
+  message: string,
+};
+
+export type ConfirmResultAction = ActionBase & {
+  name: 'confirmResult',
+  message: string,
+  result: boolean,
+};
+
+export type Action = ClickAction | CheckAction | ClosesPageAction | OpenPageAction | UncheckAction | FillAction | NavigateAction | PressAction | SelectAction | SetInputFilesAction | AssertTextAction | AssertValueAction | AssertCheckedAction | AssertVisibleAction | AssertSnapshotAction | WaitForSelectorAction | WaitForNavigationAction | WaitForTimeoutAction | WaitForLoadStateAction | WaitForResponseAction | AlertAction | ConfirmAction | ConfirmResultAction;
 export type AssertAction = AssertCheckedAction | AssertValueAction | AssertTextAction | AssertVisibleAction | AssertSnapshotAction;
 export type PerformOnRecordAction = ClickAction | CheckAction | UncheckAction | PressAction | SelectAction;
 
