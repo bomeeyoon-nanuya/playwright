@@ -55,6 +55,11 @@ export class JavaLanguageGenerator implements LanguageGenerator {
     if (this._mode !== 'library' && (action.name === 'openPage' || action.name === 'closePage'))
       return '';
 
+    // ✅ Dialog 액션들은 리스너만 등록하고 끝 (다음 액션 전에 등록됨)
+    if (['alert', 'confirm', 'confirmResult'].includes(action.name))
+      return this._generateDialogHandler(action, pageAlias);
+
+
     if (action.name === 'openPage') {
       formatter.add(`Page ${pageAlias} = context.newPage();`);
       if (action.url && action.url !== 'about:blank' && action.url !== 'chrome://newtab/')
@@ -65,13 +70,6 @@ export class JavaLanguageGenerator implements LanguageGenerator {
     const locators = actionInContext.frame.framePath.map(selector => `.${this._asLocator(selector, false)}.contentFrame()`);
     const subject = `${pageAlias}${locators.join('')}`;
     const signals = toSignalMap(action);
-
-    if (signals.dialog) {
-      formatter.add(`  ${pageAlias}.onceDialog(dialog -> {
-        System.out.println(String.format("Dialog message: %s", dialog.message()));
-        dialog.dismiss();
-      });`);
-    }
 
     let code = this._generateActionCall(subject, actionInContext, !!actionInContext.frame.framePath.length);
 
@@ -90,6 +88,32 @@ export class JavaLanguageGenerator implements LanguageGenerator {
     formatter.add(code);
 
     return formatter.format();
+  }
+
+  private _generateDialogHandler(action: any, pageAlias: string): string {
+    switch (action.name) {
+      case 'alert':
+        return `// Alert detected: "${action.message}"
+// ✅ ChatGPT 타이밍 개선: 액션 이전에 dialog 리스너 등록
+${pageAlias}.onceDialog(dialog -> {
+  System.out.println(String.format("Dialog message: %s", dialog.message()));
+  assertEquals(${quote(action.message)}, dialog.message());
+  dialog.accept();
+});`;
+      case 'confirm':
+        return `// Confirm detected: "${action.message}"`;
+      case 'confirmResult':
+        const dialogAction = action.result ? 'accept' : 'dismiss';
+        return `// User ${action.result ? 'accepted' : 'dismissed'} confirm: "${action.message}"
+// ✅ ChatGPT 타이밍 개선: 액션 이전에 dialog 리스너 등록
+${pageAlias}.onceDialog(dialog -> {
+  System.out.println(String.format("Dialog message: %s", dialog.message()));
+  assertEquals(${quote(action.message)}, dialog.message());
+  dialog.${dialogAction}();
+});`;
+      default:
+        return `// Unknown dialog action: ${action.name}`;
+    }
   }
 
   private _generateActionCall(subject: string, actionInContext: actions.ActionInContext, inFrameLocator: boolean): string {
@@ -137,6 +161,9 @@ export class JavaLanguageGenerator implements LanguageGenerator {
       case 'assertSnapshot':
         return `assertThat(${subject}.${this._asLocator(action.selector, inFrameLocator)}).matchesAriaSnapshot(${quote(action.snapshot)});`;
     }
+
+    // 기본 경우: 알 수 없는 액션
+    return `// 알 수 없는 액션: ${action.name}`;
   }
 
   private _asLocator(selector: string, inFrameLocator: boolean) {

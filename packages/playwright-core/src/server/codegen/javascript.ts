@@ -43,6 +43,11 @@ export class JavaScriptLanguageGenerator implements LanguageGenerator {
     const pageAlias = actionInContext.frame.pageAlias;
     const formatter = new JavaScriptFormatter(2);
 
+    // ✅ Dialog 액션들은 리스너만 등록하고 끝 (다음 액션 전에 등록됨)
+    if (['alert', 'confirm', 'confirmResult'].includes(action.name))
+      return this._generateDialogHandler(action, pageAlias);
+
+
     if (action.name === 'openPage') {
       formatter.add(`const ${pageAlias} = await context.newPage();`);
       if (action.url && action.url !== 'about:blank' && action.url !== 'chrome://newtab/')
@@ -53,13 +58,6 @@ export class JavaScriptLanguageGenerator implements LanguageGenerator {
     const locators = actionInContext.frame.framePath.map(selector => `.${this._asLocator(selector)}.contentFrame()`);
     const subject = `${pageAlias}${locators.join('')}`;
     const signals = toSignalMap(action);
-
-    if (signals.dialog && !['alert', 'confirm', 'confirmResult'].includes(action.name)) {
-      formatter.add(`  ${pageAlias}.once('dialog', dialog => {
-    console.log(\`Dialog message: $\{dialog.message()}\`);
-    dialog.dismiss().catch(() => {});
-  });`);
-    }
 
     if (signals.popup)
       formatter.add(`const ${signals.popup.popupAlias}Promise = ${pageAlias}.waitForEvent('popup');`);
@@ -74,6 +72,32 @@ export class JavaScriptLanguageGenerator implements LanguageGenerator {
       formatter.add(`const download${signals.download.downloadAlias} = await download${signals.download.downloadAlias}Promise;`);
 
     return formatter.format();
+  }
+
+  private _generateDialogHandler(action: any, pageAlias: string): string {
+    switch (action.name) {
+      case 'alert':
+        return `// Alert detected: "${escapeWithQuotes(action.message, '\'')}"
+// ✅ 액션 이전에 dialog 리스너 등록
+${pageAlias}.once('dialog', async dialog => {
+  console.log(\`Dialog message: $\{dialog.message()}\`);
+  await expect(dialog.message()).toBe(${quote(action.message)});
+  await dialog.accept();
+});`;
+      case 'confirm':
+        return `// Confirm detected: "${escapeWithQuotes(action.message, '\'')}"`;
+      case 'confirmResult':
+        const dialogAction = action.result ? 'accept' : 'dismiss';
+        return `// User ${action.result ? 'accepted' : 'dismissed'} confirm: "${escapeWithQuotes(action.message, '\'')}"
+// ✅ 액션 이전에 dialog 리스너 등록
+${pageAlias}.once('dialog', async dialog => {
+  console.log(\`Dialog message: $\{dialog.message()}\`);
+  await expect(dialog.message()).toBe(${quote(action.message)});
+  await dialog.${dialogAction}();
+});`;
+      default:
+        return `// Unknown dialog action: ${action.name}`;
+    }
   }
 
   private _generateActionCall(subject: string, actionInContext: actions.ActionInContext): string {
@@ -143,15 +167,6 @@ export class JavaScriptLanguageGenerator implements LanguageGenerator {
         const optionsString = formatOptions(options, false);
         return `await ${subject}.waitForNavigation(${optionsString});`;
       }
-      case 'alert':
-        return `// Alert detected: "${escapeWithQuotes(action.message, '\'')}"
-  page.on('dialog', dialog => dialog.accept());`;
-      case 'confirm':
-        return `// Confirm detected: "${escapeWithQuotes(action.message, '\'')}"`;
-      case 'confirmResult':
-        const dialogAction = action.result ? 'accept' : 'dismiss';
-        return `// User ${action.result ? 'accepted' : 'dismissed'} confirm: "${escapeWithQuotes(action.message, '\'')}"
-  page.on('dialog', dialog => dialog.${dialogAction}());`;
     }
     return `// 알 수 없는 액션: ${action.name}`;
   }

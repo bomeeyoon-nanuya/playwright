@@ -267,7 +267,59 @@ export class ContextRecorder extends EventEmitter {
   private _onDialog(page: Page) {
     const pageAlias = this._pageAliases.get(page)!;
     ++this._lastDialogOrdinal;
-    this._collection.signal(pageAlias, page.mainFrame(), { name: 'dialog', dialogAlias: this._lastDialogOrdinal ? String(this._lastDialogOrdinal) : '' });
+
+    page.once('dialog', async dialog => {
+      const dialogType = dialog.type();
+      const dialogMessage = dialog.message();
+
+      this._collection.signal(pageAlias, page.mainFrame(), {
+        name: 'dialog',
+        dialogAlias: this._lastDialogOrdinal ? String(this._lastDialogOrdinal) : ''
+      });
+
+      let userChoice: boolean = true; // true = accept, false = dismiss
+
+      const originalAccept = dialog.accept.bind(dialog);
+      const originalDismiss = dialog.dismiss.bind(dialog);
+
+      dialog.accept = async (promptText?: string) => {
+        userChoice = true;
+        await originalAccept(promptText);
+        this._recordDialogResult(page, dialogType, dialogMessage, userChoice);
+      };
+
+      dialog.dismiss = async () => {
+        userChoice = false;
+        await originalDismiss();
+        this._recordDialogResult(page, dialogType, dialogMessage, userChoice);
+      };
+    });
+  }
+
+  private async _recordDialogResult(page: Page, type: string, message: string, result: boolean) {
+    const frameDescription = await this._describeFrame(page.mainFrame());
+
+    let actionName: actions.ActionName;
+    if (type === 'alert')
+      actionName = 'alert';
+    else if (type === 'confirm')
+      actionName = 'confirmResult';
+    else
+      actionName = 'confirmResult';
+
+
+    const action: actions.Action = {
+      name: actionName,
+      message,
+      result,
+      signals: [],
+    } as actions.Action;
+
+    this._collection.addRecordedAction({
+      frame: frameDescription,
+      action,
+      startTime: monotonicTime()
+    });
   }
 }
 
