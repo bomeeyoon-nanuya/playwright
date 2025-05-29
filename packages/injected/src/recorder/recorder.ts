@@ -15,8 +15,9 @@
  */
 
 import clipPaths from './clipPaths';
-import { WaitState, createWaitOptionsContent } from './waitForOptionsContent';
+import { createWaitOptionsContent } from './waitForOptionsContent';
 
+import type { WaitState } from './types/waitForOptions.types';
 import type { Point } from '@isomorphic/types';
 import type { Highlight, HighlightEntry } from '../highlight';
 import type { InjectedScript } from '../injectedScript';
@@ -1221,6 +1222,9 @@ export class Recorder {
       addEventListener(this.document, 'scroll', event => this._onScroll(event), true),
     ];
 
+    // ✨ alert와 confirm 감지를 위한 window 메서드 오버라이드
+    this._setupWindowDialogInterception();
+
     this.highlight.install();
     let recreationInterval: number | undefined;
     const recreate = () => {
@@ -1233,6 +1237,56 @@ export class Recorder {
     this.highlight.appendChild(createSvgElement(this.document, clipPaths));
     this.overlay?.install();
     this.document.adoptedStyleSheets.push(this._stylesheet);
+  }
+
+  private _setupWindowDialogInterception() {
+    const window = this.injectedScript.window;
+
+    // 원본 alert와 confirm 메서드 저장
+    const originalAlert = window.alert;
+    const originalConfirm = window.confirm;
+
+    // alert 오버라이드
+    window.alert = (message?: any): void => {
+      // 📝 alert 액션 기록
+      this.recordAction({
+        name: 'alert',
+        message: String(message || ''),
+        signals: [],
+      });
+
+      // 원본 alert 호출
+      return originalAlert.call(window, message);
+    };
+
+    // confirm 오버라이드
+    window.confirm = (message?: string): boolean => {
+      // 📝 confirm 액션 기록 (사용자 응답 전)
+      this.recordAction({
+        name: 'confirm',
+        message: String(message || ''),
+        signals: [],
+      });
+
+      // 원본 confirm 호출하고 결과 반환
+      const result = originalConfirm.call(window, message);
+
+      // 📝 사용자 응답 결과도 기록
+      this.recordAction({
+        name: 'confirmResult',
+        message: String(message || ''),
+        result: result,
+        signals: [],
+      });
+
+      return result;
+    };
+
+    // 정리 함수 추가 (페이지 언로드 시 원본 메서드 복원)
+    this._listeners.push(() => {
+      window.alert = originalAlert;
+      window.confirm = originalConfirm;
+    });
   }
 
   private _switchCurrentTool() {
