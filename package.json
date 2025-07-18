@@ -46,12 +46,8 @@
     "build-android-driver": "./utils/build_android_driver.sh",
     "innerloop": "playwright run-server --reuse-browser",
     "dev:ready": "concurrently \"yarn workspace @shopby/playwright run build:watch\" \"yarn workspace @shopby/playwright-core run build:watch\" \"yarn workspace @playwright/test run build:watch\" \"yarn workspace html-reporter run build:watch\" \"yarn workspace @playwright/client run build:watch\" \"yarn workspace @playwright/experimental-ct-vue run build:watch\" \"yarn workspace playwright-webkit run build:watch\"",
-    "test-types": "node utils/generate_types/ && tsc -p utils/generate_types/test/tsconfig.json && tsc -p ./tests/",
-    "roll": "node utils/roll_browser.js",
-    "check-deps": "node utils/check_deps.js",
-    "build-android-driver": "./utils/build_android_driver.sh",
-    "innerloop": "playwright run-server --reuse-browser",
-    "dev:ready": "concurrently \"yarn workspace @shopby/playwright run build:watch\" \"yarn workspace @shopby/playwright-core run build:watch\" \"yarn workspace @playwright/test run build:watch\" \"yarn workspace html-reporter run build:watch\" \"yarn workspace @playwright/client run build:watch\" \"yarn workspace @playwright/experimental-ct-vue run build:watch\" \"yarn workspace playwright-webkit run build:watch\""
+    "pack:all": "yarn workspaces foreach -pt run pack",
+    "publish:all": "yarn workspaces foreach -pt run publish"
   },
   "workspaces": [
     "packages/*"
@@ -59,6 +55,7 @@
   "devDependencies": {
     "@actions/core": "^1.10.0",
     "@babel/code-frame": "^7.26.2",
+    "@changesets/cli": "^2.29.5",
     "@eslint/compat": "^1.2.6",
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.19.0",

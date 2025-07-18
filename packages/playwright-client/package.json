@@ -1,5 +1,5 @@
 {
-  "name": "@playwright/client",
+  "name": "@shopby/playwright-client",
   "private": true,
   "version": "0.0.0",
   "description": "A thin client for Playwright",
@@ -28,9 +28,11 @@
     "esbuild": "node build.js",
     "build": "npm run esbuild",
     "watch": "npm run esbuild -- --watch",
-    "build:watch": "tsc --watch || echo 'tsc --watch를 사용하려면 tsconfig.json과 typescript가 필요합니다.'"
+    "build:watch": "tsc --watch || echo 'tsc --watch를 사용하려면 tsconfig.json과 typescript가 필요합니다.'",
+    "pack": "npm pack",
+    "publish": "npm publish --access public"
   },
   "dependencies": {
-    "playwright-core": "1.52.0"
+    "@shopby/playwright-core": "1.0.9"
   }
 }

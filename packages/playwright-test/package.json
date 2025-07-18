@@ -1,5 +1,5 @@
 {
-  "name": "@playwright/test",
+  "name": "@shopby/playwright-test",
   "version": "1.52.0",
   "description": "A high-level API to automate web browsers",
   "repository": {
@@ -29,9 +29,11 @@
     "playwright": "cli.js"
   },
   "scripts": {
-    "build:watch": "tsc --watch || echo 'tsc --watch를 사용하려면 tsconfig.json과 typescript가 필요합니다.'"
+    "build:watch": "tsc --watch || echo 'tsc --watch를 사용하려면 tsconfig.json과 typescript가 필요합니다.'",
+    "pack": "npm pack",
+    "publish": "npm publish --access public"
   },
   "dependencies": {
-    "playwright": "1.52.0"
+    "@shopby/playwright": "1.0.13"
   }
 }

@@ -53,7 +53,9 @@
   },
   "scripts": {
     "postinstall": "node -e \"try { require('@shopby/playwright-core/lib/server').installBrowsersForNpmInstall(['chromium', 'firefox', 'webkit']) } catch(e) { }\"",
-    "build:watch": "tsc --watch || echo 'tsc --watch를 사용하려면 tsconfig.json과 typescript가 필요합니다.'"
+    "build:watch": "tsc --watch || echo 'tsc --watch를 사용하려면 tsconfig.json과 typescript가 필요합니다.'",
+    "pack": "npm pack",
+    "publish": "npm publish --access public"
   },
   "author": {
     "name": "ShopBy"

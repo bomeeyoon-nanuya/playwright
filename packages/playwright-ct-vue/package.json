@@ -1,5 +1,5 @@
 {
-  "name": "@playwright/experimental-ct-vue",
+  "name": "@shopby/playwright-ct-vue",
   "version": "1.52.0",
   "description": "Playwright Component Testing for Vue",
   "repository": {
@@ -15,7 +15,9 @@
   },
   "license": "Apache-2.0",
   "scripts": {
-    "build:watch": "tsc --watch || echo 'tsc --watch를 사용하려면 tsconfig.json과 typescript가 필요합니다.'"
+    "build:watch": "tsc --watch || echo 'tsc --watch를 사용하려면 tsconfig.json과 typescript가 필요합니다.'",
+    "pack": "npm pack",
+    "publish": "npm publish --access public"
   },
   "exports": {
     ".": {
@@ -33,7 +35,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@playwright/experimental-ct-core": "1.52.0",
+    "@shopby/playwright-ct-core": "1.52.0",
     "@vitejs/plugin-vue": "^5.2.0"
   },
   "bin": {
