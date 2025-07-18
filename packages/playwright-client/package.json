@@ -27,7 +27,8 @@
   "scripts": {
     "esbuild": "node build.js",
     "build": "npm run esbuild",
-    "watch": "npm run esbuild -- --watch"
+    "watch": "npm run esbuild -- --watch",
+    "build:watch": "tsc --watch || echo 'tsc --watch를 사용하려면 tsconfig.json과 typescript가 필요합니다.'"
   },
   "dependencies": {
     "playwright-core": "1.52.0"

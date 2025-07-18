@@ -28,7 +28,9 @@
   "bin": {
     "playwright": "cli.js"
   },
-  "scripts": {},
+  "scripts": {
+    "build:watch": "tsc --watch || echo 'tsc --watch를 사용하려면 tsconfig.json과 typescript가 필요합니다.'"
+  },
   "dependencies": {
     "playwright": "1.52.0"
   }

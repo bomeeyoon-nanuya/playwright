@@ -52,7 +52,8 @@
     "shopby-playwright": "cli.js"
   },
   "scripts": {
-    "postinstall": "node -e \"try { require('@shopby/playwright-core/lib/server').installBrowsersForNpmInstall(['chromium', 'firefox', 'webkit']) } catch(e) { }\""
+    "postinstall": "node -e \"try { require('@shopby/playwright-core/lib/server').installBrowsersForNpmInstall(['chromium', 'firefox', 'webkit']) } catch(e) { }\"",
+    "build:watch": "tsc --watch || echo 'tsc --watch를 사용하려면 tsconfig.json과 typescript가 필요합니다.'"
   },
   "author": {
     "name": "ShopBy"

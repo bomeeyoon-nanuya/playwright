@@ -44,7 +44,14 @@
     "roll": "node utils/roll_browser.js",
     "check-deps": "node utils/check_deps.js",
     "build-android-driver": "./utils/build_android_driver.sh",
-    "innerloop": "playwright run-server --reuse-browser"
+    "innerloop": "playwright run-server --reuse-browser",
+    "dev:ready": "concurrently \"yarn workspace @shopby/playwright run build:watch\" \"yarn workspace @shopby/playwright-core run build:watch\" \"yarn workspace @playwright/test run build:watch\" \"yarn workspace html-reporter run build:watch\" \"yarn workspace @playwright/client run build:watch\" \"yarn workspace @playwright/experimental-ct-vue run build:watch\" \"yarn workspace playwright-webkit run build:watch\"",
+    "test-types": "node utils/generate_types/ && tsc -p utils/generate_types/test/tsconfig.json && tsc -p ./tests/",
+    "roll": "node utils/roll_browser.js",
+    "check-deps": "node utils/check_deps.js",
+    "build-android-driver": "./utils/build_android_driver.sh",
+    "innerloop": "playwright run-server --reuse-browser",
+    "dev:ready": "concurrently \"yarn workspace @shopby/playwright run build:watch\" \"yarn workspace @shopby/playwright-core run build:watch\" \"yarn workspace @playwright/test run build:watch\" \"yarn workspace html-reporter run build:watch\" \"yarn workspace @playwright/client run build:watch\" \"yarn workspace @playwright/experimental-ct-vue run build:watch\" \"yarn workspace playwright-webkit run build:watch\""
   },
   "workspaces": [
     "packages/*"
